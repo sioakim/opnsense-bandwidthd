@@ -99,8 +99,11 @@ if (!bwd_atomic_write_raw($target, $out)) {
 foreach (array(BWD_BASE . '/htdocs', BWD_BASE . '/rollups') as $d) {
 	safe_mkdir($d);
 }
-/* The rollups are the household's device inventory; every reader runs as root. */
+/* The rollups are the household's device inventory; every reader runs as root.
+ * Files written before 1.0.1 were 0644 and keep that mode until rewritten, so
+ * normalise them here too — this runs on every start and reconfigure. */
 @chmod(BWD_BASE . '/rollups', 0700);
+foreach (glob(BWD_BASE . '/rollups/*.json') ?: array() as $f) { @chmod($f, 0600); }
 
 /* Reset the probe auto-off clock whenever probing is off.
  *
