@@ -12,6 +12,17 @@ dashboard, alerting engine, classifier and fingerprint engine are
 platform-independent and run off-box under the test suite. `docs/PLATFORM.md`
 records the OPNsense behaviour the plugin depends on — most of it undocumented.
 
+## What it looks like
+
+**Reporting → BandwidthD** — the dashboard, here on the plugin's own test harness
+(the real page and OPNsense's theme, over anonymised fixtures):
+
+![The BandwidthD dashboard: window selector, totals, stacked top-talker chart, host list with tags, per-host in/out chart, protocol mix and daily totals](docs/images/dashboard.png)
+
+**Services → BandwidthD → Settings**:
+
+![The settings page: enable, listen interface, subnets, CDF logging, alert rules, fingerprinting and report options](docs/images/settings.png)
+
 ## Installing on an OPNsense box
 
 Requires OPNsense 26.7 or later on amd64 and a root shell (SSH, or the
