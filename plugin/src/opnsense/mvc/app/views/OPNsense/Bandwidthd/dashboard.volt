@@ -3,7 +3,7 @@
  # Licensed under the Apache License, Version 2.0.
  #
  # The dashboard is a self-contained vanilla-JS app in /bandwidthd_ui, but its
- # chrome is OPNsense's own: every panel is a .content-box with a .content-box-head,
+ # chrome is OPNsense's own: every panel is a .content-box,
  # laid out on the Bootstrap 3 grid the rest of the GUI uses. That is what makes it
  # inherit the active theme (light, dark or auto) without this page knowing which
  # one is active — see the note at the top of bandwidthd.css.
@@ -15,10 +15,10 @@
     window.bwdCsrfToken = "{{ csrf_token }}";
 </script>
 
-<link rel="stylesheet" href="/bandwidthd_ui/css/bandwidthd.css?v=16"/>
+<link rel="stylesheet" href="/bandwidthd_ui/css/bandwidthd.css?v=19"/>
 
 <div id="bwd-app" class="bwd-app">
-    <div id="bwd-banner" class="bwd-banner" hidden></div>
+    <div id="bwd-banner" class="bwd-banner" role="status" hidden></div>
 
     {# ---- controls -------------------------------------------------------- #}
     <div class="row">
@@ -41,7 +41,7 @@
                             <button type="button" id="bwd-export-csv" class="bwd-export-btn" title="{{ lang._('Download the host table for this window as CSV (honours the tag filter; the search box is not applied)') }}">CSV</button>
                             <button type="button" id="bwd-export-json" class="bwd-export-btn" title="{{ lang._('Download the host table for this window as JSON (honours the tag filter; the search box is not applied)') }}">JSON</button>
                         </span>
-                        <span class="bwd-updated" id="bwd-updated"></span>
+                        <span class="bwd-updated" id="bwd-updated" role="status"></span>
                     </div>
                 </div>
                 <div class="bwd-customrange" id="bwd-customrange" hidden>
@@ -66,11 +66,11 @@
                     <div class="bwd-hero-side">
                         <div class="bwd-hero-stat bwd-in">
                             <span class="bwd-hero-stat-k">{{ lang._('Download') }}</span>
-                            <span class="bwd-hero-stat-v" id="bwd-hero-in">–</span>
+                            <span class="bwd-hero-stat-v"><i>▼</i> <span id="bwd-hero-in">–</span></span>
                         </div>
                         <div class="bwd-hero-stat bwd-out">
                             <span class="bwd-hero-stat-k">{{ lang._('Upload') }}</span>
-                            <span class="bwd-hero-stat-v" id="bwd-hero-out">–</span>
+                            <span class="bwd-hero-stat-v"><i>▲</i> <span id="bwd-hero-out">–</span></span>
                         </div>
                     </div>
                 </div>
@@ -87,7 +87,7 @@
                     <span class="bwd-overview-title">{{ lang._('Traffic over time — top talkers') }}</span>
                     <span class="bwd-overview-hint">{{ lang._('stacked Mbps per bin') }}</span>
                 </div>
-                <div class="bwd-overview-canvas"><canvas id="bwd-overview-chart"></canvas></div>
+                <div class="bwd-overview-canvas"><canvas id="bwd-overview-chart" role="img" aria-label="{{ lang._('Stacked traffic over time for the top talkers') }}"></canvas></div>
                 <div id="bwd-overview-empty" class="bwd-empty" hidden>{{ lang._('No data for this window yet.') }}</div>
             </div>
         </div>
@@ -98,7 +98,7 @@
         <div class="col-xs-12 col-md-4">
             <div class="content-box bwd-list-pane">
                 <div class="bwd-list-head">
-                    <input type="search" id="bwd-search" class="bwd-search"
+                    <input type="search" id="bwd-search" class="bwd-search" aria-label="{{ lang._('Search hosts') }}"
                            placeholder="{{ lang._('Search host, name, MAC, or vendor…') }}" autocomplete="off"/>
                     <div class="bwd-viewtoggle" role="group" aria-label="{{ lang._('Label by') }}">
                         <button type="button" id="bwd-view-ip" class="is-active" data-view="ip">IP</button>
@@ -113,7 +113,7 @@
                 </div>
                 <div id="bwd-tagbar" class="bwd-tagbar" role="group" aria-label="{{ lang._('Filter by device tag') }}" hidden></div>
                 <div id="bwd-tageditor" class="bwd-tageditor" hidden></div>
-                <ul id="bwd-hostlist" class="bwd-hostlist"></ul>
+                <ul id="bwd-hostlist" class="bwd-hostlist" role="listbox" aria-label="{{ lang._('Hosts') }}"></ul>
             </div>
         </div>
 
@@ -128,8 +128,8 @@
                 </div>
                 <div class="bwd-pctile" id="bwd-pctile" hidden></div>
                 <div class="bwd-chart-wrap">
-                    <canvas id="bwd-chart"></canvas>
-                    <div id="bwd-chart-empty" class="bwd-empty">{{ lang._('No time-series data yet for this host.') }}</div>
+                    <canvas id="bwd-chart" role="img" aria-label="{{ lang._('Traffic over time for the selected host') }}"></canvas>
+                    <div id="bwd-chart-empty" class="bwd-empty" hidden>{{ lang._('No time-series data yet for this host.') }}</div>
                 </div>
                 <div class="bwd-proto" id="bwd-proto"></div>
                 <div class="bwd-daily" id="bwd-daily" hidden></div>
@@ -140,4 +140,4 @@
 </div>
 
 <script src="/bandwidthd_ui/vendor/chart.umd.min.js"></script>
-<script src="/bandwidthd_ui/js/bandwidthd.js?v=16"></script>
+<script src="/bandwidthd_ui/js/bandwidthd.js?v=19"></script>

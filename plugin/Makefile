@@ -6,7 +6,7 @@
 # pkg(8), use ../scripts/build-pkgs.sh instead.
 
 PLUGIN_NAME=		bandwidthd
-PLUGIN_VERSION=		1.0.0
+PLUGIN_VERSION=		1.0.2
 PLUGIN_COMMENT=		Per-device bandwidth accounting, alerting and history
 PLUGIN_MAINTAINER=	spyros@ioakeim.com
 PLUGIN_WWW=		https://github.com/sioakim/opnsense-bandwidthd

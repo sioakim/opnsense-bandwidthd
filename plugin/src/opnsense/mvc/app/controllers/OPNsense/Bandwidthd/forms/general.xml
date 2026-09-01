@@ -114,7 +114,7 @@
         <id>bandwidthd.general.anomaly_factor</id>
         <label>Anomaly factor</label>
         <type>text</type>
-        <help>How many times the 7-day average counts as anomalous.</help>
+        <help>How many times the 7-day average counts as anomalous. Minimum 1.5; lower values are raised to it.</help>
     </field>
     <field>
         <id>bandwidthd.general.exfil_enable</id>
@@ -168,7 +168,7 @@
         <id>bandwidthd.general.report_recipients</id>
         <label>Recipients</label>
         <type>text</type>
-        <help>Comma-separated addresses. Blank uses the system notification recipient.</help>
+        <help>Comma-separated addresses. Blank writes the report to the system log instead of mailing it (OPNsense has no system-wide notification recipient).</help>
     </field>
     <field>
         <id>bandwidthd.general.report_topn</id>

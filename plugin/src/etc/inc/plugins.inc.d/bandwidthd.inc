@@ -28,6 +28,30 @@ function bandwidthd_enabled()
 }
 
 /**
+ * True when the alerts job must run. It is the only writer of the durable
+ * rollup (rollups/daily.json), which the scheduled report reads and which a
+ * per-device "alerts: on" override needs even while the global switch is off —
+ * gating it on alerts_enable alone produced an empty report every day and made
+ * the per-host override dead code. alerts.php itself skips rule evaluation
+ * when nothing is armed, so the job is cheap in that state.
+ */
+function bandwidthd_rollup_wanted()
+{
+    if (bandwidthd_setting('alerts_enable') === '1' || bandwidthd_setting('report_enable') === '1') {
+        return true;
+    }
+    $cnf = Config::getInstance()->object();
+    if (isset($cnf->OPNsense->Bandwidthd->overrides->override)) {
+        foreach ($cnf->OPNsense->Bandwidthd->overrides->override as $row) {
+            if ((string)$row->alerts_enable === 'on') {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
  * Register the daemon with Services -> ... so it gets start/stop/restart controls
  * and a status light.
  */
@@ -74,7 +98,7 @@ function bandwidthd_cron()
     /* Rotate the CDF logs daily so one log file cannot grow without bound. */
     $jobs[]['autocron'] = ['/usr/local/sbin/configctl -d bandwidthd rotate', '1', '0'];
 
-    if (bandwidthd_setting('alerts_enable') === '1') {
+    if (bandwidthd_rollup_wanted()) {
         $jobs[]['autocron'] = ['/usr/local/sbin/configctl -d bandwidthd alerts', '*/15'];
     }
 
@@ -93,7 +117,7 @@ function bandwidthd_cron()
            the lock would be released the moment the job was queued rather than
            held for its duration — an overlap guard that guards nothing. */
         $jobs[]['autocron'] = [
-            '/usr/local/bin/flock -n -E 0 -o /tmp/bandwidthd_dbexport.lock ' .
+            '/usr/local/bin/flock -n -E 0 -o /var/run/bandwidthd_dbexport.lock ' .
             '/usr/local/sbin/configctl bandwidthd dbexport',
             '*/5'
         ];
@@ -103,7 +127,7 @@ function bandwidthd_cron()
     if (bandwidthd_setting('probe_enable') === '1') {
         /* Incremental: only devices whose fingerprint is missing or stale. */
         $jobs[]['autocron'] = [
-            '/usr/local/bin/flock -n -E 0 -o /tmp/bandwidthd_probe.lock ' .
+            '/usr/local/bin/flock -n -E 0 -o /var/run/bandwidthd_probe.lock ' .
             '/usr/local/sbin/configctl bandwidthd probe --cron',
             '*/30'
         ];

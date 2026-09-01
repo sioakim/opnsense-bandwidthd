@@ -6,3 +6,6 @@ CLAUDE.local.md
 
 # OPNsense theme stylesheets fetched for the harness (their code, not ours)
 tests/harness/opnsense-*.css
+
+# Playwright MCP output (screenshots, snapshots) from harness runs
+.playwright-mcp/

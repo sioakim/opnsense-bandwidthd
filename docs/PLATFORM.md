@@ -68,12 +68,21 @@ corrupt download served with HTTP 200 — a CSV with a JSON error glued to the e
 Set the headers and `return` the string; that is what OPNsense's own download
 endpoints do.
 
-### An ACL pattern is a glob over the request path
+### An ACL pattern is an anchored regex over the full request URI
 
-`api/<plugin>/data/*` grants **every** action on that controller, writes
-included. A read-only role therefore has to list its read endpoints explicitly,
-or "may view the dashboard" quietly also means "may rewrite device overrides and
-trigger active LAN scans".
+`Core\ACL::urlMatch()` turns a pattern into `^/<pattern>$` (`*` → `.*`) and tests
+it against `$_SERVER['REQUEST_URI']` — path **and query string**, only a
+`#fragment` is stripped. Two consequences:
+
+- A read endpoint the page calls with parameters (`…/data/hosts?period=1&from=…`)
+  needs a trailing `*` on its pattern, or it never matches. Without it a user
+  holding only the Status privilege gets the page shell and a 403 on every fetch,
+  while a glob-based test of the same patterns passes. `check_plugin.php` now
+  carries a port of `urlMatch()` and tests real URIs with query strings.
+- `api/<plugin>/data/*` grants **every** action on that controller, writes
+  included. A read-only role therefore lists its read endpoints explicitly, or
+  "may view the dashboard" quietly also means "may rewrite device overrides and
+  trigger active LAN scans".
 
 ### Kea lease files must be read oldest-first
 

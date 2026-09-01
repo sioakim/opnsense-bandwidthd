@@ -176,6 +176,7 @@ function bwd_overrides_rows() {
  *
  * Item lookup is hasChild()/getChild() — ArrayField has no get(). */
 function bwd_overrides_save($rows, $reason = 'BandwidthD: per-device override') {
+	if (function_exists('bwd_host_overrides')) { bwd_host_overrides(true); }   // drop the memo of the old rows
 	$mdl = bwd_model();
 	if ($mdl === null) { return 'configuration model unavailable'; }
 	$list = $mdl->overrides->override;
@@ -288,6 +289,10 @@ function bwd_kea_leases() {
 			if (!is_ipaddrv4($ip)) { continue; }
 			$state = isset($col['state']) ? trim((string) ($row[$col['state']] ?? '0')) : '0';
 			if ($state !== '0') { unset($cache[$ip]); continue; }
+			/* state stays 0 until lease-file cleanup reclaims an expired lease; the
+			 * address may already belong to another device by then. */
+			$exp = isset($col['expire']) ? trim((string) ($row[$col['expire']] ?? '')) : '';
+			if ($exp !== '' && ctype_digit($exp) && (int) $exp < time()) { unset($cache[$ip]); continue; }
 			$mac = strtolower(trim((string) ($row[$col['hwaddr']] ?? '')));
 			$host = isset($col['hostname']) ? trim((string) ($row[$col['hostname']] ?? '')) : '';
 			$cache[$ip] = array(
@@ -329,11 +334,12 @@ function bwd_platform_hostmap() {
 
 	/* Unbound DNS host overrides. Field naming has varied across releases, so
 	 * accept both the modern and legacy spellings. */
-	$uh = bwd_config_path(BWD_MODEL_PATH === '' ? '' : 'OPNsense/unboundplus/hosts/host', array());
+	$uh = bwd_config_path('OPNsense/unboundplus/hosts/host', array());
 	if (is_array($uh)) {
 		if (isset($uh['hostname']) || isset($uh['host'])) { $uh = array($uh); }
 		foreach ($uh as $h) {
 			if (!is_array($h)) { continue; }
+			if (isset($h['enabled']) && (string) $h['enabled'] === '0') { continue; }   // disabled override
 			$ip = $h['server'] ?? ($h['ip'] ?? '');
 			$name = $h['hostname'] ?? ($h['host'] ?? '');
 			if ($ip !== '' && $name !== '') {
@@ -342,7 +348,8 @@ function bwd_platform_hostmap() {
 		}
 	}
 
-	/* dnsmasq host overrides (repeated <hosts> elements, not a container). */
+	/* dnsmasq host overrides (repeated <hosts> elements, not a container — the
+	 * model mounts at /dnsmasq and <hosts> is the ArrayField itself). */
 	$dh = bwd_config_path('dnsmasq/hosts', array());
 	if (is_array($dh)) {
 		if (isset($dh['host']) || isset($dh['ip'])) { $dh = array($dh); }
@@ -368,6 +375,24 @@ function bwd_platform_hostmap() {
 }
 
 /* Kea static reservations from config.xml -> [ip => ['mac'=>..,'hostname'=>..]]. */
+/* dnsmasq static reservations: ip -> mac from the same <hosts> rows the hostmap
+ * reads, so a dnsmasq-only box gets identity for quiet devices the way a Kea box
+ * does from its reservations. */
+function bwd_dnsmasq_reservations() {
+	static $cache = null;
+	if ($cache !== null) { return $cache; }
+	$cache = array();
+	$dh = bwd_config_path('dnsmasq/hosts', array());
+	if (!is_array($dh)) { return $cache; }
+	if (isset($dh['host']) || isset($dh['ip']) || isset($dh['hwaddr'])) { $dh = array($dh); }
+	foreach ($dh as $h) {
+		if (!is_array($h) || empty($h['ip']) || empty($h['hwaddr']) || !empty($h['ignore'])) { continue; }
+		$mac = strtolower(trim((string) $h['hwaddr']));
+		if (preg_match('/^([0-9a-f]{2}:){5}[0-9a-f]{2}$/', $mac) && is_ipaddrv4((string) $h['ip'])) { $cache[(string) $h['ip']] = $mac; }
+	}
+	return $cache;
+}
+
 function bwd_kea_reservations() {
 	static $cache = null;
 	if ($cache !== null) { return $cache; }
@@ -388,6 +413,8 @@ function bwd_kea_reservations() {
 /* Build IP -> MAC. The live ARP table is authoritative; Kea reservations and
  * DHCP leases fill in devices that are currently quiet. */
 function bwd_platform_macmap() {
+	static $memo = null;   // one arp -an fork per request, not one per reader
+	if ($memo !== null) { return $memo; }
 	$map = array();
 	$out = array();
 	@exec('/usr/sbin/arp -an 2>/dev/null', $out);
@@ -399,10 +426,13 @@ function bwd_platform_macmap() {
 	foreach (bwd_kea_reservations() as $ip => $r) {
 		if (!isset($map[$ip]) && $r['mac'] !== '') { $map[$ip] = $r['mac']; }
 	}
+	foreach (bwd_dnsmasq_reservations() as $ip => $mac) {
+		if (!isset($map[$ip])) { $map[$ip] = $mac; }
+	}
 	foreach (bwd_kea_leases() + bwd_dnsmasq_leases() as $ip => $l) {
 		if (!isset($map[$ip]) && !empty($l['mac'])) { $map[$ip] = $l['mac']; }
 	}
-	return $map;
+	return $memo = $map;
 }
 
 /* Monitored subnets: the CIDRs bandwidthd is told to watch, mirroring what the
@@ -548,6 +578,9 @@ function bwd_send_mail($subject, $text, $html, $recipients) {
 		 * attacker-influenced subject, but this is the seam every future one uses,
 		 * and device names (which alert subjects want) come from DHCP hostnames. */
 		$subject = str_replace(array("\r", "\n"), ' ', (string) $subject);
+		/* Report subjects carry an em dash and device names may be anything the
+		 * DHCP client sent; headers are ASCII-only, so RFC 2047-encode the rest. */
+		if (preg_match('/[^\x20-\x7E]/', $subject)) { $subject = '=?UTF-8?B?' . base64_encode($subject) . '?='; }
 		$boundary = '=_bwd_' . md5(uniqid('', true));
 		$msg = "From: BandwidthD <$from>\r\n"
 			. 'To: ' . implode(', ', $to) . "\r\n"
@@ -555,8 +588,8 @@ function bwd_send_mail($subject, $text, $html, $recipients) {
 			. 'Date: ' . date('r') . "\r\n"
 			. "MIME-Version: 1.0\r\n"
 			. "Content-Type: multipart/alternative; boundary=\"$boundary\"\r\n\r\n"
-			. "--$boundary\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n" . $text . "\r\n"
-			. "--$boundary\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n" . $html . "\r\n"
+			. "--$boundary\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n" . $text . "\r\n"
+			. "--$boundary\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n" . $html . "\r\n"
 			. "--$boundary--\r\n";
 		/* Dot-stuff so a line of "." in the body cannot end the message early. */
 		$msg = preg_replace('/^\./m', '..', str_replace("\n", "\r\n", str_replace("\r\n", "\n", $msg)));

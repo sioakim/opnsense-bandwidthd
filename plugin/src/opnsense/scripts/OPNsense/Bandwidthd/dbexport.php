@@ -31,7 +31,6 @@ require_once(__DIR__ . '/lib/bwd_platform.inc.php');
 require_once(__DIR__ . '/lib/bwd_data.inc.php');
 require_once(__DIR__ . '/lib/bwd_db.inc.php');
 
-define('BWD_ROLLUP', BWD_BASE . '/rollups/daily.json');
 define('BWD_SPOOL', BWD_BASE . '/rollups/dbexport_spool.ndjson');
 define('BWD_EXPORT_STATE', BWD_BASE . '/rollups/dbexport_state.json');
 define('BWD_LOCK', BWD_BASE . '/rollups/dbexport.lock');
@@ -52,7 +51,7 @@ function exp_state_load() {
 	return array('capture_watermark' => (int) ($s['capture_watermark'] ?? 0),
 		'fails' => (int) ($s['fails'] ?? 0), 'notified' => (int) ($s['notified'] ?? 0));
 }
-function exp_state_save($s) { return bwd_atomic_write(BWD_EXPORT_STATE, json_encode($s)); }
+function exp_state_save($s) { return bwd_atomic_write(BWD_EXPORT_STATE, bwd_json($s)); }
 
 /* Append usage/iface records to the bounded spool. Records: usage rows as the
  * 11-elem array prefixed "u"; iface as ["i",ts,in,out]. */
@@ -64,12 +63,12 @@ function spool_append($rows, $iface) {
 	 * below the expected total so the caller does NOT advance the capture watermark
 	 * over samples that never reached the spool. */
 	foreach ($rows as $r) {
-		$line = json_encode(array_merge(array('u'), $r)) . "\n";
+		$line = bwd_json(array_merge(array('u'), $r)) . "\n";
 		if (fwrite($fh, $line) !== strlen($line)) { fclose($fh); spool_enforce_cap(); return $n; }
 		$n++;
 	}
 	foreach ($iface as $ts => $io) {
-		$line = json_encode(array('i', $ts, (int) round($io[0]), (int) round($io[1]))) . "\n";
+		$line = bwd_json(array('i', $ts, (int) round($io[0]), (int) round($io[1]))) . "\n";
 		if (fwrite($fh, $line) !== strlen($line)) { fclose($fh); spool_enforce_cap(); return $n; }
 		$n++;
 	}
@@ -172,7 +171,7 @@ function db_write_iface($conn, $P, $iface) {
 function read_cdf($after) {
 	$macmap = bwd_macmap();
 	$rows = array(); $iface = array(); $devs = array(); $maxTs = $after;
-	foreach (bwd_cdf_files(1) as $file) {
+	foreach (bwd_cdf_files(1, $after + 1, 0) as $file) {
 		$fh = @fopen($file, 'r');
 		if (!$fh) { continue; }
 		while (($line = fgets($fh)) !== false) {

@@ -202,27 +202,40 @@ foreach ($aclXml->{'page-status-bandwidthd'}->patterns->pattern as $pat) {
     $statusPatterns[] = (string)$pat;
 }
 ok(!empty($statusPatterns), 'the status ACL declares patterns');
+/* Port of OPNsense\Core\ACL::urlMatch(): an anchored regex over the FULL request
+ * URI, query string included — not a glob over the path. A bare pattern with no
+ * trailing * never matches a call that carries parameters, which is how the
+ * Status role once got a dashboard whose every fetch was denied while this test
+ * passed with fnmatch(). */
+function bwd_test_url_match($url, $mask) {
+    $match = str_replace(['.', '*', '?'], ['\.', '.*', '\?'], $mask);
+    $match = preg_replace('@([/&?])\.\*$@', '($1.*)?', $match);
+    $url = preg_replace('@#.*$@', '', $url);
+    return preg_match("@^/{$match}$@", $url) === 1;
+}
+function bwd_test_acl_grants(array $patterns, $uri) {
+    foreach ($patterns as $pat) {
+        if (bwd_test_url_match($uri, $pat)) {
+            return true;
+        }
+    }
+    return false;
+}
 foreach ($writeActions as $w) {
-    $granted = false;
-    foreach ($statusPatterns as $pat) {
-        if (fnmatch($pat, $w)) {
-            $granted = true;
-            break;
-        }
+    foreach (["/$w", "/$w?mac=00:11:22:33:44:55", "/$w/"] as $uri) {
+        ok(!bwd_test_acl_grants($statusPatterns, $uri), "read-only status ACL does not grant the write endpoint: $uri");
     }
-    ok(!$granted, "read-only status ACL does not grant the write endpoint: $w");
 }
-/* And it must still grant everything the dashboard actually reads. */
+/* And it must still grant everything the dashboard actually reads — as the JS
+ * requests it, with the query string the framework matches against. */
 foreach (['hosts', 'series', 'percentile', 'daily', 'overview', 'tags', 'status', 'override', 'export'] as $a) {
-    $granted = false;
-    foreach ($statusPatterns as $pat) {
-        if (fnmatch($pat, "api/bandwidthd/data/$a")) {
-            $granted = true;
-            break;
-        }
+    foreach (["/api/bandwidthd/data/$a", "/api/bandwidthd/data/$a?period=1&from=0&to=0&mac=aa:bb"] as $uri) {
+        ok(bwd_test_acl_grants($statusPatterns, $uri), "status ACL grants the read endpoint the dashboard needs: $uri");
     }
-    ok($granted, "status ACL grants the read endpoint the dashboard needs: $a");
 }
+ok(bwd_test_acl_grants($statusPatterns, '/api/bandwidthd/service/status'), 'status ACL grants the service status read');
+ok(bwd_test_acl_grants($statusPatterns, '/ui/bandwidthd/dashboard'), 'status ACL grants the dashboard page');
+ok(!bwd_test_acl_grants($statusPatterns, '/ui/bandwidthd/general'), 'status ACL does not grant the settings page');
 
 /* 8c. A download action must RETURN its body. Calling $this->response->send()
  *     sends it, the framework sends again, throws "Response Already Sent", and
@@ -530,6 +543,20 @@ foreach (glob("$root/tests/harness/*.json") ?: [] as $f) {
 }
 ok(in_array('CLAUDE.local.md', array_map('trim', file("$root/.gitignore")), true),
     '.gitignore excludes CLAUDE.local.md');
+
+/* 11b. The alerts job is the only writer of the rollup the report reads, and the
+ *      per-device "alerts: on" override needs it while the global switch is off.
+ *      Gating the job on alerts_enable alone shipped an empty daily report. */
+$hookSrc = file_get_contents("$src/etc/inc/plugins.inc.d/bandwidthd.inc");
+ok(preg_match('/if \(bandwidthd_rollup_wanted\(\)\)\s*\{[^}]*bandwidthd alerts/s', $hookSrc) === 1,
+    'the alerts cron job is gated on bandwidthd_rollup_wanted(), not alerts_enable alone');
+ok(preg_match('/function bandwidthd_rollup_wanted\(\).*?report_enable.*?alerts_enable.*?\n\}/s', $hookSrc) === 1,
+    'bandwidthd_rollup_wanted() considers report_enable and the per-device alerts override');
+/* 11c. The prebuilt daemon binary is a shipped artefact: a changed checksum is a
+ *      deliberate, reviewed rebuild, never a silent one. */
+$binSha = hash_file('sha256', "$root/daemon/prebuilt/usr/local/bandwidthd/bandwidthd");
+ok(strpos(file_get_contents("$root/daemon/README.md"), $binSha) !== false,
+    'daemon/README.md records the sha256 of the committed bandwidthd binary');
 
 /* 12. The package repository under repo/: the fingerprint clients install must be the
  *     sha256 of the committed public key (that is what pkg(8) checks a signed

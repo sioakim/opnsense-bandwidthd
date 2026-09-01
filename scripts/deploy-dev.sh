@@ -14,9 +14,12 @@ HOST="${1:?usage: sh scripts/deploy-dev.sh user@host}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# macOS tar writes AppleDouble/xattr entries that FreeBSD's bsdtar aborts on.
-COPYFILE_DISABLE=1 tar czf - -C "${REPO_ROOT}" \
-	--exclude='.git' --exclude='dist' --exclude='.DS_Store' --exclude='._*' \
+# macOS tar writes AppleDouble/xattr entries that FreeBSD's bsdtar aborts on
+# ("Cannot restore extended attributes"). COPYFILE_DISABLE drops the AppleDouble
+# files; --no-xattrs --no-mac-metadata drop the per-file attributes screenshots
+# and Finder-touched files carry. Both are needed.
+COPYFILE_DISABLE=1 tar czf - -C "${REPO_ROOT}" --no-xattrs --no-mac-metadata \
+	--exclude='.git' --exclude='dist' --exclude='.DS_Store' --exclude='._*' --exclude='docs/images' \
 	. | ssh "${HOST}" 'rm -rf /root/opnsense-bandwidthd && mkdir -p /root/opnsense-bandwidthd && tar xzf - -C /root/opnsense-bandwidthd'
 
 ssh "${HOST}" 'sh -s' <<'REMOTE'

@@ -38,8 +38,10 @@
 	/* OPNsense brand + Bootstrap contextual colours, as the theme defines them. */
 	--bwd-accent:      #C03E14;
 	--bwd-accent-soft: rgba(192, 62, 20, .10);
+	--bwd-on-accent:   #fff;                    /* text on an active (accent) control */
 	--bwd-negative:    #f05050;
 	--bwd-warning:     #f0ad4e;
+	--bwd-warning-soft: rgba(240, 173, 78, .12);
 
 	/* Direction: the first two Tableau Classic10 entries, matching core's charts. */
 	--bwd-in:  #1f77b4;   /* download */
@@ -95,7 +97,7 @@
 	border: 1px solid var(--bwd-warning);
 	border-left-width: 4px;
 	border-radius: var(--bwd-radius);
-	background: rgba(240, 173, 78, .12);
+	background: var(--bwd-warning-soft);
 	font-size: 12px;
 }
 
@@ -139,10 +141,14 @@
 .bwd-window.is-active {
 	background: var(--bwd-accent);
 	border-color: var(--bwd-accent);
-	color: #fff;
+	color: var(--bwd-on-accent);
 }
 .bwd-window.is-active + .bwd-window { border-left-color: var(--bwd-accent); }
-.bwd-window:focus-visible { outline: 2px solid var(--bwd-accent); outline-offset: 1px; }
+/* One focus ring for every control the plugin draws; the host rows are focusable
+   too and take an inset ring so it is not clipped by the scrolling list. */
+.bwd-app button:focus-visible,
+.bwd-app .bwd-host:focus-visible { outline: 2px solid var(--bwd-accent); outline-offset: 1px; }
+.bwd-app .bwd-host:focus-visible { outline-offset: -2px; }
 
 .bwd-totals {
 	display: flex;
@@ -175,8 +181,7 @@
 .bwd-range-reset,
 .bwd-te-btn,
 .bwd-te-close,
-.bwd-tag-edit-btn,
-.bwd-btn {
+.bwd-tag-edit-btn {
 	padding: 3px 9px;
 	border: 1px solid var(--bwd-line);
 	border-radius: var(--bwd-radius);
@@ -190,18 +195,17 @@
 .bwd-range-reset:hover,
 .bwd-te-btn:hover,
 .bwd-te-close:hover,
-.bwd-tag-edit-btn:hover,
-.bwd-btn:hover { background: var(--bwd-inset); }
+.bwd-tag-edit-btn:hover { background: var(--bwd-inset); }
 .bwd-te-save {
 	background: var(--bwd-accent);
 	border-color: var(--bwd-accent);
-	color: #fff;
+	color: var(--bwd-on-accent);
 }
 .bwd-te-save:hover { filter: brightness(.92); }
 .bwd-probe-btn:disabled { opacity: .55; cursor: default; }
 
 .bwd-updated { font-size: 11px; color: var(--bwd-muted); white-space: nowrap; }
-.bwd-updated.bwd-stale { color: var(--bwd-negative); }
+.bwd-updated.bwd-stale { color: inherit; font-weight: 600; }   /* red text was 3.5:1; the ⚠ carries the state */
 
 .bwd-customrange {
 	display: flex;
@@ -252,7 +256,6 @@
 	font-weight: 300;
 	line-height: 1.05;
 }
-.bwd-hero-sub { font-size: 12px; color: var(--bwd-muted); }
 .bwd-hero-side { display: flex; gap: 22px; }
 .bwd-hero-stat-k {
 	display: block;
@@ -262,8 +265,14 @@
 	color: var(--bwd-muted);
 }
 .bwd-hero-stat-v { display: block; font-size: 19px; font-weight: 600; }
-.bwd-hero-stat.bwd-in  .bwd-hero-stat-v { color: var(--bwd-in); }
-.bwd-hero-stat.bwd-out .bwd-hero-stat-v { color: var(--bwd-out); }
+/* Direction colour lives on the ▼/▲ glyph, never on the number: the Classic10
+ * orange is 2.5:1 as text on the light theme and the blue 3.9:1 on dark. */
+.bwd-app .bwd-in > i,
+.bwd-app .bwd-hero-stat.bwd-in i,
+.bwd-app i.bwd-in  { color: var(--bwd-in);  font-style: normal; }
+.bwd-app .bwd-out > i,
+.bwd-app .bwd-hero-stat.bwd-out i,
+.bwd-app i.bwd-out { color: var(--bwd-out); font-style: normal; }
 
 .bwd-cards { display: flex; flex-wrap: wrap; gap: 0; }
 .bwd-card {
@@ -306,7 +315,7 @@
 .bwd-overview-hint { font-size: 11px; color: var(--bwd-muted); }
 .bwd-overview-canvas { padding: 10px 12px; height: 230px; position: relative; }
 .bwd-chart-wrap { padding: 10px 12px; height: 240px; position: relative; }
-.bwd-overview-canvas canvas, .bwd-chart-wrap canvas { max-height: 100%; }
+.bwd-overview-canvas canvas, .bwd-chart-wrap canvas { display: block; max-height: 100%; }
 
 /* ----------------------------------------------------- 4. host list (table) */
 
@@ -339,7 +348,7 @@
 .bwd-sort.is-active {
 	background: var(--bwd-accent);
 	border-color: var(--bwd-accent);
-	color: #fff;
+	color: var(--bwd-on-accent);
 }
 .bwd-sortbar {
 	display: flex;
@@ -386,8 +395,6 @@
 }
 .bwd-host-nums { font-size: 11px; white-space: nowrap; text-align: right; }
 .bwd-host-nums .bwd-num + .bwd-num { margin-left: 6px; }
-.bwd-host-nums .bwd-in  { color: var(--bwd-in); }
-.bwd-host-nums .bwd-out { color: var(--bwd-out); }
 .bwd-host-sub {
 	font-size: 11px;
 	color: var(--bwd-muted);
@@ -410,6 +417,9 @@
 }
 .bwd-host-total { font-weight: 600; }
 .bwd-model { color: var(--bwd-muted); }
+/* Muted inside muted compounds to 49% ink (2.7:1): inherit the container's. */
+.bwd-detail-sub .bwd-model,
+.bwd-detail-sub .bwd-ctag { color: inherit; }
 
 /* ------------------------------------------------------------- 5. badges */
 
@@ -470,9 +480,9 @@
 .bwd-tag-chip.is-active {
 	background: var(--bwd-accent);
 	border-color: var(--bwd-accent);
-	color: #fff;
+	color: var(--bwd-on-accent);
 }
-.bwd-tag-n { opacity: .65; margin-left: 3px; }
+.bwd-tag-n { opacity: .75; margin-left: 3px; }
 /* Custom (operator) tags stay visually distinct from the auto type tag. */
 .bwd-tag-chip--custom { border-style: dashed; }
 .bwd-tag-chip--custom.is-active { border-style: solid; }
@@ -496,11 +506,9 @@
 }
 .bwd-stat.bwd-in i  { background: var(--bwd-in); }
 .bwd-stat.bwd-out i { background: var(--bwd-out); }
-/* Deliberately NOT `color: inherit`: the label beside it is muted, and inheriting
- * that made the headline In/Out/Total numbers render grey. */
+/* The number inherits the theme ink (the coloured dot beside it carries the
+ * direction); only the label is muted. */
 .bwd-stat b { display: block; font-size: 15px; font-weight: 600; }
-.bwd-stat.bwd-in b  { color: var(--bwd-in); }
-.bwd-stat.bwd-out b { color: var(--bwd-out); }
 
 .bwd-pctile {
 	display: flex;
@@ -544,7 +552,7 @@
 /* --------------------------------------------------------- 7. day ledger */
 
 .bwd-daily { border-top: 1px solid var(--bwd-line-soft); }
-.bwd-daily-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+.bwd-daily-tbl { width: 100%; border-collapse: collapse; font-size: 11px; color: inherit; }   /* not the theme's table{color:#444} */
 .bwd-daily-tbl th {
 	text-align: left;
 	font-weight: 600;
@@ -557,7 +565,8 @@
 }
 .bwd-daily-tbl td { padding: 4px 12px; border-bottom: 1px solid var(--bwd-line-soft); }
 .bwd-daily-tbl tr:nth-child(odd) td { background: var(--bwd-inset); }
-.bwd-daily-num { text-align: right; white-space: nowrap; }
+.bwd-daily-num,
+.bwd-daily-tbl th.bwd-daily-num { text-align: right; white-space: nowrap; }
 .bwd-daily-date { white-space: nowrap; }
 .bwd-daily-tot { font-weight: 600; }
 .bwd-daily-barcell { width: 40%; min-width: 90px; }
@@ -623,7 +632,7 @@
 	border-bottom: 1px solid var(--bwd-line-soft);
 	font-size: 12px;
 }
-.bwd-te-n { color: var(--bwd-muted); font-size: 11px; }
+.bwd-te-n { color: var(--bwd-muted); font-size: 11px; white-space: nowrap; }
 .bwd-app .bwd-te-row input {
 	padding: 2px 6px;
 	border: 1px solid var(--bwd-line);
@@ -677,7 +686,11 @@
 	.bwd-card { flex-basis: 50%; border-right: 0; }
 	.bwd-detail-stats { gap: 12px; }
 	.bwd-hostlist { max-height: 320px; }
-	.bwd-overview-canvas, .bwd-chart-wrap { height: 190px; }
+	.bwd-chart-wrap { height: 190px; }
+	.bwd-overview-canvas { height: 300px; }   /* the 9-entry legend takes ~85px; 190 left a 39px plot */
+	/* 44px touch targets for the controls (the host rows already are). */
+	.bwd-window, .bwd-sort, .bwd-viewtoggle button, .bwd-export-btn, .bwd-range-reset { padding-top: 12px; padding-bottom: 12px; }
+	.bwd-tag-chip { padding: 7px 8px; }
 	.bwd-daily-barcell,
 	.bwd-daily-barhead { display: none; }   /* header and cells together, or the row widths disagree */
 }

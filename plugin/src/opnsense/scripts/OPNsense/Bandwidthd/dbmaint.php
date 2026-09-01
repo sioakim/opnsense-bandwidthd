@@ -13,7 +13,6 @@
  *      reader serves the day from `bwd_daily` — never both (no double-count).
  *   2. Retention — optional cap on `bwd_daily` age.
  *   3. Maintenance — VACUUM (ANALYZE) the tables so stats/space stay healthy.
- *   4. Trim the unbounded rollups/api_access.log to its last N lines.
  *
  * Retention is OFF by default (db_fine_retention_days = 0 keeps all fine rows);
  * nothing is deleted until the operator sets a window. Idempotent + safe to
@@ -27,8 +26,6 @@ require_once(__DIR__ . '/lib/bwd_platform.inc.php');
 require_once(__DIR__ . '/lib/bwd_data.inc.php');
 require_once(__DIR__ . '/lib/bwd_db.inc.php');
 
-define('BWD_API_LOG', BWD_BASE . '/rollups/api_access.log');
-define('BWD_API_LOG_MAX', 5000);      // keep the last N access-log lines
 define('BWD_MAINT_MAX_DAYS', 120);    // bound work per run (catch-up over time)
 
 $DRY = in_array('--dry-run', $argv, true) || in_array('-n', $argv, true);
@@ -134,18 +131,4 @@ if (!$DRY) {
 		@pg_query($conn, "VACUUM (ANALYZE) {$P}$t");
 	}
 	echo "vacuum/analyze done.\n";
-}
-
-/* ---- 4. Trim the append-only API access log ---- */
-if (is_file(BWD_API_LOG)) {
-	$lines = @file(BWD_API_LOG, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-	if ($lines !== false && count($lines) > BWD_API_LOG_MAX) {
-		$keep = array_slice($lines, -BWD_API_LOG_MAX);
-		if ($DRY) {
-			printf("DRY: would trim api_access.log %d -> %d lines.\n", count($lines), count($keep));
-		} else {
-			@file_put_contents(BWD_API_LOG, implode("\n", $keep) . "\n", LOCK_EX);
-			printf("trimmed api_access.log %d -> %d lines.\n", count($lines), count($keep));
-		}
-	}
 }

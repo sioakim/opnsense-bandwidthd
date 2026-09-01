@@ -450,7 +450,29 @@ function bwd_fp_identify_device($ip, $opts = array()) {
 	$best['observations'] = array('server' => $obs['server'], 'titles' => $obs['titles'], 'open' => $obs['open'],
 		'endpoints' => array_keys($obs['endpoints']), 'mdns' => $obs['mdns'], 'ssdp' => $obs['ssdp'],
 		'banners' => $obs['banners'], 'tls' => $obs['tls'], 'nmap' => $obs['nmap']);
-	return $best;
+	return bwd_fp_clean_deep($best);
+}
+
+/* Everything in a fingerprint result except the numbers came off the wire from
+ * the device itself. Before it is persisted and re-read on every hosts request:
+ * drop control characters, replace invalid UTF-8, and cap each string, so a
+ * hostile or merely broken device can neither corrupt the cache (json_encode of
+ * invalid UTF-8 is false) nor inflate it with a 64 KB "model". */
+function bwd_fp_clean($s, $cap = 200) {
+	if (!is_string($s)) { return $s; }
+	$s = @iconv('UTF-8', 'UTF-8//IGNORE', $s);
+	if ($s === false) { $s = ''; }
+	$s = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $s);
+	if (strlen($s) > $cap) { $s = substr($s, 0, $cap); $s = @iconv('UTF-8', 'UTF-8//IGNORE', $s) ?: ''; }
+	return $s;
+}
+function bwd_fp_clean_deep($v, $cap = 200) {
+	if (is_array($v)) {
+		$out = array();
+		foreach ($v as $k => $x) { $out[bwd_fp_clean((string) $k, 64)] = bwd_fp_clean_deep($x, $cap); }
+		return $out;
+	}
+	return bwd_fp_clean($v, $cap);
 }
 
 /* ============================ CACHE ============================ */
@@ -483,7 +505,7 @@ function bwd_fp_store($mac, $ip, $result) {
 		if (count($c) > 1000) { $c = array_slice($c, -800, null, true); }
 		$ret = $result;
 	}
-	bwd_atomic_write(BWD_FP_CACHE, json_encode($c));
+	bwd_atomic_write(BWD_FP_CACHE, bwd_json($c));
 	if ($lock) { @flock($lock, LOCK_UN); @fclose($lock); }
 	return $ret;
 }

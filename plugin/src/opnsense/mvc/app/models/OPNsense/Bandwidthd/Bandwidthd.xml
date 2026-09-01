@@ -16,7 +16,8 @@
                 <multiple>N</multiple>
             </interface>
             <!-- Subnets counted as "local"; traffic between them and the outside is
-                 attributed to the local host. Defaults to the sniffed interface's own. -->
+                 attributed to the local host. Defaults to LAN (an empty selection
+                 falls back to it too, see bwd_config_path). -->
             <interfaces type="InterfaceField">
                 <default>lan</default>
                 <Required>N</Required>
