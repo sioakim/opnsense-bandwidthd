@@ -8,8 +8,8 @@
 PLUGIN_NAME=		bandwidthd
 PLUGIN_VERSION=		1.0.0
 PLUGIN_COMMENT=		Per-device bandwidth accounting, alerting and history
-PLUGIN_MAINTAINER=	maintainer@example.com
-PLUGIN_WWW=		https://gogs.ioakeim.com/sioakim/opnsense-bandwidthd
+PLUGIN_MAINTAINER=	spyros@ioakeim.com
+PLUGIN_WWW=		https://github.com/sioakim/opnsense-bandwidthd
 PLUGIN_DEPENDS=		bandwidthd
 
 .include "../../Mk/plugins.mk"

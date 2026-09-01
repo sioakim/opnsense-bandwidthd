@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>os-bandwidthd package repository</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 42rem; margin: 3rem auto; padding: 0 1rem; color: #222; }
+  pre { background: #f4f4f4; padding: .75rem 1rem; overflow-x: auto; border-radius: 4px; }
+  code { font-size: .95em; }
+  h1 { font-size: 1.6rem; }
+</style>
+</head>
+<body>
+<h1>os-bandwidthd — package repository for OPNsense</h1>
+<p>Per-device bandwidth accounting for OPNsense: an interactive traffic dashboard,
+traffic alerting and a device classifier, built around the <code>bandwidthd</code>
+capture daemon. Source and documentation:
+<a href="https://github.com/sioakim/opnsense-bandwidthd">github.com/sioakim/opnsense-bandwidthd</a>.</p>
+
+<h2>Add the repository</h2>
+<p>As root on the firewall:</p>
+<pre><code>fetch -o - https://sioakim.github.io/opnsense-bandwidthd/install-repo.sh | sh</code></pre>
+<p>Then install <strong>os-bandwidthd</strong> from <em>System → Firmware → Plugins</em>,
+or with <code>pkg install os-bandwidthd</code>. The plugin pulls in the
+<code>bandwidthd</code> daemon and <code>libgd</code> automatically.</p>
+
+<h2>Or by hand</h2>
+<pre><code>mkdir -p /usr/local/etc/pkg/fingerprints/bandwidthd/trusted
+fetch -o /usr/local/etc/pkg/fingerprints/bandwidthd/trusted/bandwidthd \
+  https://sioakim.github.io/opnsense-bandwidthd/fingerprints/trusted/bandwidthd
+fetch -o /usr/local/etc/pkg/repos/bandwidthd.conf \
+  https://sioakim.github.io/opnsense-bandwidthd/bandwidthd.conf
+pkg update -r bandwidthd
+pkg install os-bandwidthd</code></pre>
+
+<h2>What you get</h2>
+<p>Packages are signed; <code>pkg</code> verifies every download against the
+fingerprint above. The repository is per-ABI (<code>${ABI}</code> in the URL, e.g.
+<code>FreeBSD:15:amd64</code>) and currently ships amd64 builds for OPNsense 26.7.</p>
+
+<h2>Remove</h2>
+<pre><code>pkg delete os-bandwidthd bandwidthd
+rm -f /usr/local/etc/pkg/repos/bandwidthd.conf
+rm -rf /usr/local/etc/pkg/fingerprints/bandwidthd</code></pre>
+</body>
+</html>

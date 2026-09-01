@@ -4,7 +4,7 @@
 	"version": "@@BWD_VERSION@@",
 	"comment": "Tracks bandwidth usage by IP address",
 	"maintainer": "@@MAINTAINER@@",
-	"www": "https://gogs.ioakeim.com/sioakim/opnsense-bandwidthd",
+	"www": "https://github.com/sioakim/opnsense-bandwidthd",
 	"abi": "@@ABI@@",
 	"prefix": "/usr/local",
 	"licenselogic": "single",

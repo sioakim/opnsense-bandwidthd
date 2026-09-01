@@ -527,5 +527,20 @@ foreach (glob("$root/tests/harness/*.json") ?: [] as $f) {
 ok(in_array('CLAUDE.local.md', array_map('trim', file("$root/.gitignore")), true),
     '.gitignore excludes CLAUDE.local.md');
 
+/* 12. The package repository under repo/: the fingerprint clients install must be the
+ *     sha256 of the committed public key (that is what pkg(8) checks a signed
+ *     catalogue against), and the repo config must name that fingerprint directory. */
+$fpFile = file_get_contents("$root/repo/fingerprints/trusted/bandwidthd");
+ok(preg_match('/^function: sha256\nfingerprint: ([0-9a-f]{64})\n$/', $fpFile, $fpm) === 1,
+    'repo fingerprint file has the pkg(8) shape');
+ok(isset($fpm[1]) && $fpm[1] === hash_file('sha256', "$root/repo/bandwidthd.pub"),
+    'repo fingerprint is the sha256 of repo/bandwidthd.pub');
+$repoConf = file_get_contents("$root/repo/bandwidthd.conf");
+ok(strpos($repoConf, 'fingerprints: "/usr/local/etc/pkg/fingerprints/bandwidthd"') !== false,
+    'repo config points at the bandwidthd fingerprint directory');
+ok(strpos($repoConf, 'signature_type: "fingerprints"') !== false, 'repo config requires signatures');
+ok(strpos(file_get_contents("$root/repo/install-repo.sh"), '/usr/local/etc/pkg/fingerprints/bandwidthd/trusted') !== false,
+    'installer writes the fingerprint where the repo config looks for it');
+
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

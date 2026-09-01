@@ -81,3 +81,21 @@ runtime JS error or a broken render:
 python3 -m http.server 8899   # from the repository root
 open http://127.0.0.1:8899/tests/harness/dashboard.html
 ```
+
+## Releasing to the package repository
+
+Releases are a signed `pkg(8)` repository on GitHub Pages; users add it once and
+then install and upgrade through the normal firmware flow. Two steps:
+
+```sh
+# on the box, from a synced copy of the tree (scripts/deploy-dev.sh does the sync)
+sh scripts/build-repo.sh                 # builds both packages, signs the catalogue
+
+# on the workstation
+sh scripts/publish-repo.sh root@fw       # fetches dist/repo, pushes the gh-pages branch
+```
+
+Bump `PLUGIN_VERSION` (in `scripts/lib/common.sh`, or via the environment) before
+building. `build-repo.sh` refuses to sign with a key whose fingerprint differs
+from the committed `repo/fingerprints/trusted/bandwidthd`, because clients would
+reject the result. Key custody, first-time setup and rotation: `REPOSITORY.md`.

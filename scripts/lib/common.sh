@@ -8,7 +8,7 @@
 : "${PLUGIN_VERSION:=1.0.0}"           # os-bandwidthd version
 : "${BWD_VERSION:=2.0.1_12}"           # bandwidthd (daemon) version
 : "${LIBGD_VERSION:=2.3.3_13,1}"       # graphics/gd dependency pin
-: "${MAINTAINER:=maintainer@example.com}"
+: "${MAINTAINER:=spyros@ioakeim.com}"
 
 # ---- Paths ------------------------------------------------------------------
 : "${REPO_ROOT:?REPO_ROOT must be set before sourcing common.sh}"

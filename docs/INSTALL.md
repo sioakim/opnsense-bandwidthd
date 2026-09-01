@@ -5,16 +5,36 @@
 - OPNsense 26.7 or later on amd64 (developed against 26.7.3, FreeBSD 15.1, PHP 8.5)
 - Root SSH or console access to run the installer
 
-## Install
+## Install from the package repository
 
-Copy the repository to the box and run:
+As root on the firewall:
+
+```sh
+fetch -o - https://sioakim.github.io/opnsense-bandwidthd/install-repo.sh | sh
+```
+
+This installs the repository's signing fingerprint and its `pkg(8)` config
+(`/usr/local/etc/pkg/repos/bandwidthd.conf`) and refreshes the catalogue. Then
+either install **os-bandwidthd** from *System → Firmware → Plugins* — it is
+listed like any other plugin — or run `pkg install os-bandwidthd`. The `bandwidthd`
+daemon and `libgd` come in as dependencies. Upgrades arrive through the normal
+firmware update flow, since the repository is a regular `pkg` repository.
+
+The manual equivalent, and how the repository is built and signed, is in
+`REPOSITORY.md`.
+
+## Install from source
+
+On the box, from a copy of this repository:
 
 ```sh
 sh scripts/build-pkgs.sh
 sh scripts/install.sh
 ```
 
-Then in the GUI (`http://<firewall>` — this box serves it on port 81):
+## First steps in the GUI
+
+In the GUI:
 
 1. **Services → BandwidthD → Settings** — tick *Enable*, pick the listen
    interface (usually LAN) and save. *Log CDF data* is on by default and is what
@@ -74,6 +94,13 @@ All are off by default.
 
 ```sh
 pkg delete os-bandwidthd bandwidthd
+```
+
+To drop the repository as well:
+
+```sh
+rm -f /usr/local/etc/pkg/repos/bandwidthd.conf
+rm -rf /usr/local/etc/pkg/fingerprints/bandwidthd
 ```
 
 Settings remain in `config.xml`, and the CDF logs and rollups remain under

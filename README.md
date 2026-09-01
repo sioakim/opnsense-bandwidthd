@@ -12,6 +12,20 @@ dashboard, alerting engine, classifier and fingerprint engine are
 platform-independent and run off-box under the test suite. `docs/PLATFORM.md`
 records the OPNsense behaviour the plugin depends on — most of it undocumented.
 
+## Installing
+
+On the firewall, as root:
+
+```sh
+fetch -o - https://sioakim.github.io/opnsense-bandwidthd/install-repo.sh | sh
+```
+
+That adds a signed package repository. Then install **os-bandwidthd** from
+*System → Firmware → Plugins*, or with `pkg install os-bandwidthd`; it pulls in
+the `bandwidthd` daemon and `libgd`. The manual steps, what gets installed and
+building from source are in `docs/INSTALL.md`; how the repository itself works is
+in `docs/REPOSITORY.md`.
+
 ## What it does
 
 **Dashboard** (Reporting → BandwidthD) — a self-contained vanilla-JS page:
@@ -64,9 +78,10 @@ plugin/src/                      the os-bandwidthd plugin (rooted at /usr/local)
   opnsense/service/              configd actions + templates
   www/bandwidthd_ui/             CSS, JS, fonts, vendored Chart.js
 daemon/                          the bandwidthd package (prebuilt binary + port recipe)
-scripts/                         build, install, dev-deploy
+repo/                            package-repository config, signing fingerprint, installer
+scripts/                         build, install, dev-deploy, repository publish
 tests/                           off-box unit + structural checks
-docs/                            BUILD, INSTALL, PLATFORM, POSTGRES
+docs/                            BUILD, INSTALL, PLATFORM, POSTGRES, REPOSITORY
 ```
 
 ## Development

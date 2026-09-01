@@ -44,6 +44,21 @@ See the tree in `README.md`. The one structural rule: `plugin/src/` is rooted at
 `gen_plist` walks the whole staged tree — anything you add under `src/` ships,
 and anything at the top of a stage root would install at `/`.
 
+## Releasing
+
+Releases go out as a signed `pkg(8)` repository on GitHub Pages (`gh-pages`
+branch); `docs/REPOSITORY.md` has the whole picture. Two things to know when
+touching it:
+
+- `repo/` is the client-facing material: the repo config, the installer, the
+  landing page, and the public key with its fingerprint. **The fingerprint is
+  load-bearing** — every client has it installed, `build-repo.sh` refuses a key
+  that doesn't match it, and `check_plugin.php` asserts it is the sha256 of
+  `repo/bandwidthd.pub`. Never regenerate it casually.
+- The flow is `scripts/build-repo.sh` on the box, then `scripts/publish-repo.sh`
+  here. `origin` is a private remote; `github` is the public mirror and the Pages
+  host. Both get `main`.
+
 ## The platform seam
 
 `lib/bwd_platform.inc.php` is the **only** file that knows about OPNsense. The
