@@ -1,0 +1,231 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>BandwidthD dashboard harness</title>
+<!--
+  Runs the REAL dashboard JS against captured (anonymised) API fixtures, with no
+  firewall. Catches what php -l and node --check cannot: a runtime error in the
+  page, or the JS asking for an endpoint that does not exist.
+
+  Open tests/harness/dashboard.html in a browser, or drive it headless.
+-->
+<script>
+  window.__bwdCalls = [];
+  window.__bwdErrors = [];
+  window.addEventListener('error', function (e) { window.__bwdErrors.push(String(e.message)); });
+  window.addEventListener('unhandledrejection', function (e) { window.__bwdErrors.push('rejection: ' + e.reason); });
+
+  // Map /api/bandwidthd/data/<action> onto a fixture file. An action with no
+  // fixture is recorded and answered with {} — it shows up as an unmapped call
+  // rather than a silent failure.
+  var FIXTURES = ['status', 'hosts', 'overview', 'series', 'percentile', 'daily', 'tags'];
+  window.fetch = function (url, opts) {
+    window.__bwdCalls.push({ url: String(url), method: (opts && opts.method) || 'GET',
+                             csrf: !!(opts && opts.headers && opts.headers['X-CSRFToken']) });
+    var m = String(url).match(/\/api\/bandwidthd\/data\/(\w+)/);
+    var action = m ? m[1] : '';
+    if (FIXTURES.indexOf(action) >= 0) {
+      return fetch_real(action + '.json');
+    }
+    return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve({}); } });
+  };
+  function fetch_real(file) {
+    return new Promise(function (resolve, reject) {
+      var x = new XMLHttpRequest();
+      x.open('GET', file, true);
+      x.onload = function () {
+        var body = x.responseText;
+        resolve({ ok: true, status: 200, json: function () { return Promise.resolve(JSON.parse(body)); } });
+      };
+      x.onerror = function () { reject(new Error('fixture load failed: ' + file)); };
+      x.send();
+    });
+  }
+</script>
+
+
+
+<script>
+    window.bwdCsrfToken = "harness-token";
+</script>
+
+<!-- OPNsense's own theme CSS, so the harness renders the page exactly as the
+     GUI does. Fetched into tests/harness/ by refresh-theme.sh. -->
+<link rel="stylesheet" id="opn-theme" href="opnsense-main.css"/>
+<script>
+  // ?theme=dark loads OPNsense's dark stylesheet instead. The plugin CSS is
+  // unchanged between the two - if anything needs a dark-specific rule, that
+  // is the bug this switch exists to expose.
+  if (new URLSearchParams(location.search).get("theme") === "dark") {
+    document.getElementById("opn-theme").href = "opnsense-dark.css";
+  }
+</script>
+<div class="page-content-main" style="padding:15px"><div class="container-fluid">
+
+
+
+<script>
+    window.bwdCsrfToken = "harness-token";
+</script>
+
+<link rel="stylesheet" href="../../plugin/src/www/bandwidthd_ui/css/bandwidthd.css?v=16"/>
+
+
+
+
+<script>
+    window.bwdCsrfToken = "harness-token";
+</script>
+
+<link rel="stylesheet" href="../../plugin/src/www/bandwidthd_ui/css/bandwidthd.css?v=16"/>
+
+<div id="bwd-app" class="bwd-app">
+    <div id="bwd-banner" class="bwd-banner" hidden></div>
+
+    
+    <div class="row">
+        <div class="col-xs-12">
+            <div class="content-box bwd-reveal">
+                <div class="bwd-toolbar">
+                    <div class="bwd-windows" role="group" aria-label="Time window">
+                        <button type="button" class="bwd-window" data-secs="3600" aria-pressed="false" data-period="1">1h</button>
+                        <button type="button" class="bwd-window" data-secs="21600" aria-pressed="false" data-period="1">6h</button>
+                        <button type="button" class="bwd-window is-active" data-secs="86400" data-period="1" aria-pressed="true">24h</button>
+                        <button type="button" class="bwd-window" data-secs="604800" aria-pressed="false" data-period="2">7d</button>
+                        <button type="button" class="bwd-window" data-secs="2592000" aria-pressed="false" data-period="3">30d</button>
+                        <button type="button" class="bwd-window" data-secs="31536000" aria-pressed="false" data-period="4">1y</button>
+                        <button type="button" class="bwd-window bwd-window-custom" data-custom="1" aria-expanded="false" aria-controls="bwd-customrange">Custom</button>
+                    </div>
+                    <div class="bwd-totals">
+                        <span class="bwd-pill bwd-in"><i></i>In <b id="bwd-tot-in">–</b></span>
+                        <span class="bwd-pill bwd-out"><i></i>Out <b id="bwd-tot-out">–</b></span>
+                        <span class="bwd-export" role="group" aria-label="Export data">
+                            <button type="button" id="bwd-export-csv" class="bwd-export-btn" title="Download the host table for this window as CSV (honours the tag filter; the search box is not applied)">CSV</button>
+                            <button type="button" id="bwd-export-json" class="bwd-export-btn" title="Download the host table for this window as JSON (honours the tag filter; the search box is not applied)">JSON</button>
+                        </span>
+                        <span class="bwd-updated" id="bwd-updated"></span>
+                    </div>
+                </div>
+                <div class="bwd-customrange" id="bwd-customrange" hidden>
+                    <span class="bwd-range-label">Custom range</span>
+                    <label class="bwd-dt">From <input type="datetime-local" id="bwd-from"></label>
+                    <label class="bwd-dt">To <input type="datetime-local" id="bwd-to"></label>
+                    <button type="button" id="bwd-range-reset" class="bwd-range-reset" title="Back to 24h">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="row">
+        <div class="col-xs-12">
+            <div class="content-box bwd-reveal bwd-reveal-1" id="bwd-overview">
+                <div class="bwd-hero">
+                    <div class="bwd-hero-main">
+                        <span class="bwd-hero-label">Total traffic · <span id="bwd-hero-window">this window</span></span>
+                        <span class="bwd-hero-num" id="bwd-hero-total">–</span>
+                    </div>
+                    <div class="bwd-hero-side">
+                        <div class="bwd-hero-stat bwd-in">
+                            <span class="bwd-hero-stat-k">Download</span>
+                            <span class="bwd-hero-stat-v" id="bwd-hero-in">–</span>
+                        </div>
+                        <div class="bwd-hero-stat bwd-out">
+                            <span class="bwd-hero-stat-k">Upload</span>
+                            <span class="bwd-hero-stat-v" id="bwd-hero-out">–</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bwd-cards" id="bwd-cards"></div>
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="row">
+        <div class="col-xs-12">
+            <div class="content-box bwd-reveal bwd-reveal-2">
+                <div class="bwd-overview-head">
+                    <span class="bwd-overview-title">Traffic over time — top talkers</span>
+                    <span class="bwd-overview-hint">stacked Mbps per bin</span>
+                </div>
+                <div class="bwd-overview-canvas"><canvas id="bwd-overview-chart"></canvas></div>
+                <div id="bwd-overview-empty" class="bwd-empty" hidden>No data for this window yet.</div>
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="row bwd-reveal bwd-reveal-3">
+        <div class="col-xs-12 col-md-4">
+            <div class="content-box bwd-list-pane">
+                <div class="bwd-list-head">
+                    <input type="search" id="bwd-search" class="bwd-search"
+                           placeholder="Search host, name, MAC, or vendor…" autocomplete="off"/>
+                    <div class="bwd-viewtoggle" role="group" aria-label="Label by">
+                        <button type="button" id="bwd-view-ip" class="is-active" data-view="ip">IP</button>
+                        <button type="button" id="bwd-view-name" data-view="name">Name</button>
+                    </div>
+                </div>
+                <div class="bwd-sortbar">
+                    <button type="button" class="bwd-sort is-active" data-sort="total">Total</button>
+                    <button type="button" class="bwd-sort" data-sort="in">In</button>
+                    <button type="button" class="bwd-sort" data-sort="out">Out</button>
+                    <button type="button" class="bwd-sort" data-sort="label">Name</button>
+                </div>
+                <div id="bwd-tagbar" class="bwd-tagbar" role="group" aria-label="Filter by device tag" hidden></div>
+                <div id="bwd-tageditor" class="bwd-tageditor" hidden></div>
+                <ul id="bwd-hostlist" class="bwd-hostlist"></ul>
+            </div>
+        </div>
+
+        <div class="col-xs-12 col-md-8">
+            <div class="content-box bwd-detail-pane">
+                <div class="bwd-detail-head">
+                    <div>
+                        <h2 id="bwd-detail-title">Select a host</h2>
+                        <div id="bwd-detail-sub" class="bwd-detail-sub"></div>
+                    </div>
+                    <div class="bwd-detail-stats" id="bwd-detail-stats"></div>
+                </div>
+                <div class="bwd-pctile" id="bwd-pctile" hidden></div>
+                <div class="bwd-chart-wrap">
+                    <canvas id="bwd-chart"></canvas>
+                    <div id="bwd-chart-empty" class="bwd-empty">No time-series data yet for this host.</div>
+                </div>
+                <div class="bwd-proto" id="bwd-proto"></div>
+                <div class="bwd-daily" id="bwd-daily" hidden></div>
+                <div class="bwd-alertcfg" id="bwd-alertcfg" hidden></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="../../plugin/src/www/bandwidthd_ui/vendor/chart.umd.min.js"></script>
+<script src="../../plugin/src/www/bandwidthd_ui/js/bandwidthd.js?v=16"></script>
+
+</div></div>
+<script>
+  // Report once the dashboard has had a chance to load and render.
+  setTimeout(function () {
+    var byAction = {};
+    window.__bwdCalls.forEach(function (c) {
+      var m = c.url.match(/\/api\/bandwidthd\/data\/(\w+)/);
+      if (m) { byAction[m[1]] = (byAction[m[1]] || 0) + 1; }
+    });
+    window.__bwdResult = {
+      errors: window.__bwdErrors,
+      actions: byAction,
+      calls: window.__bwdCalls.length,
+      nonApiCalls: window.__bwdCalls.filter(function (c) { return c.url.indexOf('/api/bandwidthd/data/') < 0; }).map(function (c) { return c.url; }),
+      hostRows: document.querySelectorAll('#bwd-hostlist li').length,
+      heroTotal: (document.querySelector('#bwd-hero-total') || {}).textContent,
+      totalIn: (document.querySelector('#bwd-tot-in') || {}).textContent,
+      cards: document.querySelectorAll('#bwd-cards > *').length,
+      charts: document.querySelectorAll('canvas').length
+    };
+    var el = document.createElement('pre');
+    el.id = 'bwd-harness-result';
+    el.textContent = JSON.stringify(window.__bwdResult, null, 2);
+    document.body.appendChild(el);
+  }, 2500);
+</script>

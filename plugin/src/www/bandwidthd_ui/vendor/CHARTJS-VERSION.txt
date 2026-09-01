@@ -1,0 +1,2 @@
+Chart.js v4.4.9 — MIT License — https://www.chartjs.org/
+Vendored for offline use inside the plugin.

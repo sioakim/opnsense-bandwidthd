@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# PROVIDE: bandwidthd
+# REQUIRE: NETWORKING SERVERS
+# BEFORE:  DAEMON
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="bandwidthd"
+rcvar="bandwidthd_enable"
+
+command="/usr/local/bandwidthd/bandwidthd"
+pidfile="/var/run/bandwidthd.pid"
+start_precmd="bandwidthd_precmd"
+
+# bandwidthd has no --config flag: it reads ./etc/bandwidthd.conf relative to the
+# working directory, or /usr/local/bandwidthd/etc/bandwidthd.conf. Regenerate that
+# from config.xml on every start so the running daemon always matches the GUI.
+bandwidthd_precmd()
+{
+	/usr/local/bin/php /usr/local/opnsense/scripts/OPNsense/Bandwidthd/setup.php
+}
+
+load_rc_config $name
+: ${bandwidthd_enable:="NO"}
+
+run_rc_command "$1"

@@ -1,0 +1,10 @@
+<menu>
+    <Services>
+        <BandwidthD VisibleName="BandwidthD" cssClass="fa fa-tachometer fa-fw" order="80">
+            <Settings VisibleName="Settings" url="/ui/bandwidthd/general" order="10"/>
+        </BandwidthD>
+    </Services>
+    <Reporting>
+        <BandwidthD VisibleName="BandwidthD" cssClass="fa fa-area-chart fa-fw" url="/ui/bandwidthd/dashboard" order="45"/>
+    </Reporting>
+</menu>

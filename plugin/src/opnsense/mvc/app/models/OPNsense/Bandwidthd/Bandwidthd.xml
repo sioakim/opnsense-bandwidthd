@@ -1,0 +1,240 @@
+<model>
+    <mount>//OPNsense/Bandwidthd</mount>
+    <version>1.0.0</version>
+    <description>BandwidthD — per-device bandwidth accounting, alerting and history</description>
+    <items>
+        <general>
+            <enabled type="BooleanField">
+                <default>0</default>
+                <Required>Y</Required>
+            </enabled>
+            <!-- The interface bandwidthd sniffs. One only: bandwidthd opens a single
+                 pcap handle (dev = one interface) per running daemon. -->
+            <interface type="InterfaceField">
+                <default>lan</default>
+                <Required>Y</Required>
+                <multiple>N</multiple>
+            </interface>
+            <!-- Subnets counted as "local"; traffic between them and the outside is
+                 attributed to the local host. Defaults to the sniffed interface's own. -->
+            <interfaces type="InterfaceField">
+                <default>lan</default>
+                <Required>N</Required>
+                <multiple>Y</multiple>
+            </interfaces>
+            <subnets_extra type="TextField">
+                <Required>N</Required>
+                <mask>/^([0-9.\/,;\s]){0,512}$/</mask>
+                <ValidationMessage>Only IPv4 CIDR subnets, separated by comma or space.</ValidationMessage>
+            </subnets_extra>
+            <promiscuous type="BooleanField">
+                <default>0</default>
+            </promiscuous>
+            <sensorid type="TextField">
+                <Required>N</Required>
+                <mask>/^([a-zA-Z0-9._-]){0,64}$/</mask>
+            </sensorid>
+
+            <!-- Graph / logging options -->
+            <drawgraphs type="BooleanField">
+                <default>0</default>
+            </drawgraphs>
+            <skipintervals type="IntegerField">
+                <default>0</default>
+                <MinimumValue>0</MinimumValue>
+                <MaximumValue>1000</MaximumValue>
+            </skipintervals>
+            <graphcutoff type="IntegerField">
+                <default>1024</default>
+                <MinimumValue>0</MinimumValue>
+                <MaximumValue>1048576</MaximumValue>
+            </graphcutoff>
+            <!-- CDF logging is what the dashboard reads; on by default here, unlike
+                 upstream bandwidthd, because without it the whole UI is empty. -->
+            <outputcdf type="BooleanField">
+                <default>1</default>
+            </outputcdf>
+            <recovercdf type="BooleanField">
+                <default>1</default>
+            </recovercdf>
+            <advfilter type="TextField">
+                <Required>N</Required>
+                <mask>/^([^\n\r]){0,512}$/</mask>
+                <ValidationMessage>A single-line libpcap filter expression.</ValidationMessage>
+            </advfilter>
+
+            <!-- Traffic alerts -->
+            <alerts_enable type="BooleanField">
+                <default>0</default>
+            </alerts_enable>
+            <quota_iface_gb type="TextField">
+                <default>0</default>
+                <mask>/^([0-9]*\.?[0-9]*)$/</mask>
+                <ValidationMessage>A number of gigabytes, 0 to disable.</ValidationMessage>
+            </quota_iface_gb>
+            <quota_host_gb type="TextField">
+                <default>0</default>
+                <mask>/^([0-9]*\.?[0-9]*)$/</mask>
+                <ValidationMessage>A number of gigabytes, 0 to disable.</ValidationMessage>
+            </quota_host_gb>
+            <anomaly_enable type="BooleanField">
+                <default>0</default>
+            </anomaly_enable>
+            <anomaly_factor type="TextField">
+                <default>3</default>
+                <mask>/^([0-9]*\.?[0-9]*)$/</mask>
+            </anomaly_factor>
+            <exfil_enable type="BooleanField">
+                <default>0</default>
+            </exfil_enable>
+            <newdevice_enable type="BooleanField">
+                <default>0</default>
+            </newdevice_enable>
+
+            <!-- Device classification / fingerprinting -->
+            <classify_subnet_rules type="TextField">
+                <Required>N</Required>
+                <mask>/^([\s\S]){0,4096}$/</mask>
+                <ValidationMessage>One CIDR=tag rule per line.</ValidationMessage>
+            </classify_subnet_rules>
+            <probe_enable type="BooleanField">
+                <default>0</default>
+            </probe_enable>
+            <probe_auto_off_hours type="IntegerField">
+                <default>24</default>
+                <MinimumValue>0</MinimumValue>
+                <MaximumValue>8760</MaximumValue>
+            </probe_auto_off_hours>
+
+            <!-- Scheduled email report -->
+            <report_enable type="BooleanField">
+                <default>0</default>
+            </report_enable>
+            <report_freq type="OptionField">
+                <default>daily</default>
+                <OptionValues>
+                    <daily>Daily</daily>
+                    <weekly>Weekly</weekly>
+                </OptionValues>
+            </report_freq>
+            <report_recipients type="TextField">
+                <Required>N</Required>
+                <mask>/^([^\n\r]){0,512}$/</mask>
+            </report_recipients>
+            <report_topn type="IntegerField">
+                <default>10</default>
+                <MinimumValue>1</MinimumValue>
+                <MaximumValue>100</MaximumValue>
+            </report_topn>
+
+            <!-- External PostgreSQL history. Inert unless a pgsql PHP extension is
+                 present; OPNsense's repo ships none (see docs/POSTGRES.md). -->
+            <db_enable type="BooleanField">
+                <default>0</default>
+            </db_enable>
+            <db_host type="TextField">
+                <Required>N</Required>
+                <mask>/^([a-zA-Z0-9._:-]){0,128}$/</mask>
+            </db_host>
+            <db_port type="IntegerField">
+                <default>5432</default>
+                <MinimumValue>1</MinimumValue>
+                <MaximumValue>65535</MaximumValue>
+            </db_port>
+            <db_name type="TextField">
+                <Required>N</Required>
+                <mask>/^([a-zA-Z0-9._-]){0,64}$/</mask>
+            </db_name>
+            <db_user type="TextField">
+                <Required>N</Required>
+                <mask>/^([a-zA-Z0-9._-]){0,64}$/</mask>
+            </db_user>
+            <db_pass type="TextField">
+                <Required>N</Required>
+                <mask>/^([^\n\r]){0,128}$/</mask>
+            </db_pass>
+            <db_sslmode type="OptionField">
+                <default>require</default>
+                <OptionValues>
+                    <disable>disable</disable>
+                    <allow>allow</allow>
+                    <prefer>prefer</prefer>
+                    <require>require</require>
+                    <verify-ca>verify-ca</verify-ca>
+                    <verify-full>verify-full</verify-full>
+                </OptionValues>
+            </db_sslmode>
+            <db_fine_retention_days type="IntegerField">
+                <default>0</default>
+                <MinimumValue>0</MinimumValue>
+                <MaximumValue>3650</MaximumValue>
+            </db_fine_retention_days>
+            <db_daily_retention_days type="IntegerField">
+                <default>0</default>
+                <MinimumValue>0</MinimumValue>
+                <MaximumValue>3650</MaximumValue>
+            </db_daily_retention_days>
+        </general>
+
+        <!-- Per-device overrides. An ArrayField has no column cap and never
+             drops fields it has no form control for. -->
+        <overrides>
+            <override type="ArrayField">
+                <match type="TextField">
+                    <Required>Y</Required>
+                    <mask>/^([0-9a-fA-F:.]){3,64}$/</mask>
+                    <ValidationMessage>A MAC address or an IPv4 address.</ValidationMessage>
+                </match>
+                <name type="TextField">
+                    <Required>N</Required>
+                    <mask>/^([^\n\r]){0,64}$/</mask>
+                </name>
+                <vendor type="TextField">
+                    <Required>N</Required>
+                    <mask>/^([^\n\r]){0,64}$/</mask>
+                </vendor>
+                <tag type="TextField">
+                    <default>auto</default>
+                    <Required>N</Required>
+                    <mask>/^([a-z0-9_-]){0,32}$/</mask>
+                </tag>
+                <quota_host_gb type="TextField">
+                    <Required>N</Required>
+                    <mask>/^([0-9]*\.?[0-9]*)$/</mask>
+                </quota_host_gb>
+                <alerts_enable type="OptionField">
+                    <default>inherit</default>
+                    <OptionValues>
+                        <inherit>Inherit</inherit>
+                        <on>On</on>
+                        <off>Off</off>
+                    </OptionValues>
+                </alerts_enable>
+                <anomaly_enable type="OptionField">
+                    <default>inherit</default>
+                    <OptionValues>
+                        <inherit>Inherit</inherit>
+                        <on>On</on>
+                        <off>Off</off>
+                    </OptionValues>
+                </anomaly_enable>
+                <exfil_enable type="OptionField">
+                    <default>inherit</default>
+                    <OptionValues>
+                        <inherit>Inherit</inherit>
+                        <on>On</on>
+                        <off>Off</off>
+                    </OptionValues>
+                </exfil_enable>
+                <newdevice_enable type="OptionField">
+                    <default>inherit</default>
+                    <OptionValues>
+                        <inherit>Inherit</inherit>
+                        <on>On</on>
+                        <off>Off</off>
+                    </OptionValues>
+                </newdevice_enable>
+            </override>
+        </overrides>
+    </items>
+</model>

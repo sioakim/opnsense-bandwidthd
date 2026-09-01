@@ -1,0 +1,239 @@
+<form>
+    <field>
+        <id>bandwidthd.general.enabled</id>
+        <label>Enable</label>
+        <type>checkbox</type>
+        <help>Run the bandwidthd capture daemon.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.interface</id>
+        <label>Listen interface</label>
+        <type>dropdown</type>
+        <help>The interface bandwidthd sniffs. Only one: the daemon opens a single pcap handle.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.interfaces</id>
+        <label>Local subnets</label>
+        <type>select_multiple</type>
+        <help>
+            Interfaces whose subnets count as "local". Traffic between a local subnet and
+            anything outside it is attributed to the local device.
+        </help>
+    </field>
+    <field>
+        <id>bandwidthd.general.subnets_extra</id>
+        <label>Additional subnets</label>
+        <type>text</type>
+        <help>Extra IPv4 CIDR subnets to treat as local, separated by comma or space.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.promiscuous</id>
+        <label>Promiscuous mode</label>
+        <type>checkbox</type>
+        <help>See traffic that is not addressed to this host (needed on a mirrored/SPAN port).</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.sensorid</id>
+        <label>Sensor name</label>
+        <type>text</type>
+        <help>Arbitrary label for this sensor. Defaults to the hostname.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.advfilter</id>
+        <label>Capture filter</label>
+        <type>text</type>
+        <help>Optional libpcap filter expression restricting what is counted.</help>
+        <advanced>true</advanced>
+    </field>
+
+    <field>
+        <id>bandwidthd.general.outputcdf</id>
+        <label>Log CDF data</label>
+        <type>checkbox</type>
+        <help>
+            Write the CDF time series the dashboard reads. Turning this off leaves the
+            dashboard with no data.
+        </help>
+    </field>
+    <field>
+        <id>bandwidthd.general.recovercdf</id>
+        <label>Recover CDF on start</label>
+        <type>checkbox</type>
+        <help>Read existing CDF logs back on startup so history survives a restart.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.drawgraphs</id>
+        <label>Draw legacy graphs</label>
+        <type>checkbox</type>
+        <help>
+            Render bandwidthd's own PNG graphs. The dashboard does not use them; leave off
+            unless you want the legacy HTML report.
+        </help>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>bandwidthd.general.skipintervals</id>
+        <label>Skip intervals</label>
+        <type>text</type>
+        <help>Intervals to skip between graph renders.</help>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>bandwidthd.general.graphcutoff</id>
+        <label>Graph cutoff (KB)</label>
+        <type>text</type>
+        <help>Minimum traffic before a host is graphed.</help>
+        <advanced>true</advanced>
+    </field>
+
+    <field>
+        <id>bandwidthd.general.alerts_enable</id>
+        <label>Enable traffic alerts</label>
+        <type>checkbox</type>
+        <help>Evaluate the rules below every 15 minutes and log matches to the system log.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.quota_iface_gb</id>
+        <label>Interface daily quota (GB)</label>
+        <type>text</type>
+        <help>Alert when the interface total for the day exceeds this. 0 disables.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.quota_host_gb</id>
+        <label>Per-device daily quota (GB)</label>
+        <type>text</type>
+        <help>Alert when any one device exceeds this in a day. 0 disables. Overridable per device.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.anomaly_enable</id>
+        <label>Anomaly detection</label>
+        <type>checkbox</type>
+        <help>Alert when a device's 24-hour traffic far exceeds its own recent average.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.anomaly_factor</id>
+        <label>Anomaly factor</label>
+        <type>text</type>
+        <help>How many times the 7-day average counts as anomalous.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.exfil_enable</id>
+        <label>Exfiltration heuristic</label>
+        <type>checkbox</type>
+        <help>Alert when a device's upload dominates its traffic — unusual for most clients.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.newdevice_enable</id>
+        <label>New device alerts</label>
+        <type>checkbox</type>
+        <help>Alert when a previously unseen MAC starts moving traffic.</help>
+    </field>
+
+    <field>
+        <id>bandwidthd.general.classify_subnet_rules</id>
+        <label>Classification rules</label>
+        <type>textbox</type>
+        <help>One CIDR=tag rule per line, e.g. 10.0.50.0/24=iot. Highest-weighted classifier signal.</help>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>bandwidthd.general.probe_enable</id>
+        <label>Active fingerprinting</label>
+        <type>checkbox</type>
+        <help>
+            Allow active probing (HTTP/TLS/mDNS/SSDP/banner) of LAN devices to identify them.
+            Off by default; probes only the monitored subnets.
+        </help>
+    </field>
+    <field>
+        <id>bandwidthd.general.probe_auto_off_hours</id>
+        <label>Auto-disable probing after (hours)</label>
+        <type>text</type>
+        <help>Turn probing back off this long after enabling it. 0 keeps it on indefinitely.</help>
+        <advanced>true</advanced>
+    </field>
+
+    <field>
+        <id>bandwidthd.general.report_enable</id>
+        <label>Scheduled report</label>
+        <type>checkbox</type>
+        <help>Email a usage and anomaly summary on a schedule.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.report_freq</id>
+        <label>Report frequency</label>
+        <type>dropdown</type>
+    </field>
+    <field>
+        <id>bandwidthd.general.report_recipients</id>
+        <label>Recipients</label>
+        <type>text</type>
+        <help>Comma-separated addresses. Blank uses the system notification recipient.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.report_topn</id>
+        <label>Devices in report</label>
+        <type>text</type>
+    </field>
+
+    <field>
+        <id>bandwidthd.general.db_enable</id>
+        <label>External history database</label>
+        <type>checkbox</type>
+        <help>
+            Offload durable history to an external PostgreSQL server. Requires a pgsql PHP
+            extension, which OPNsense does not ship — see docs/POSTGRES.md.
+        </help>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>bandwidthd.general.db_host</id>
+        <label>Database host</label>
+        <type>text</type>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>bandwidthd.general.db_port</id>
+        <label>Port</label>
+        <type>text</type>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>bandwidthd.general.db_name</id>
+        <label>Database name</label>
+        <type>text</type>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>bandwidthd.general.db_user</id>
+        <label>Username</label>
+        <type>text</type>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>bandwidthd.general.db_pass</id>
+        <label>Password</label>
+        <type>password</type>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>bandwidthd.general.db_sslmode</id>
+        <label>SSL mode</label>
+        <type>dropdown</type>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>bandwidthd.general.db_fine_retention_days</id>
+        <label>Fine retention (days)</label>
+        <type>text</type>
+        <help>Roll per-interval rows older than this into daily totals. 0 keeps them forever.</help>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>bandwidthd.general.db_daily_retention_days</id>
+        <label>Daily retention (days)</label>
+        <type>text</type>
+        <help>Delete daily totals older than this. 0 keeps them forever.</help>
+        <advanced>true</advanced>
+    </field>
+</form>

@@ -1,0 +1,683 @@
+/*
+ * bandwidthd.css — BandwidthD dashboard, styled to sit inside OPNsense.
+ *
+ * Design brief: look like the rest of the firewall, not like a guest.
+ * OPNsense ships no design tokens (its themes are whole-stylesheet swaps with no
+ * custom properties and no marker on <body>), so the rule here is INHERIT, DON'T
+ * DECLARE:
+ *
+ *   - typography, text colour and panel chrome come from the active theme, via
+ *     OPNsense's own classes (content-box, table, label, btn) used in the markup;
+ *   - anything this file must draw itself uses `currentColor` or a neutral
+ *     rgba(128,128,128,a) overlay, which lands correctly on both the light
+ *     (#fff / #373736) and dark (#101218 / #ECECEC) themes with no branching;
+ *   - the few real colours are OPNsense's own: the #C03E14 brand rust, Bootstrap
+ *     contextual colours, and Tableau Classic10 for chart series — the palette
+ *     core's Traffic and Firewall widgets use (Chart.colorschemes.tableau.Classic10).
+ *
+ * The --bwd-* tokens remain the single place colour is defined, and the chart JS
+ * reads them through cssVar(), so a re-skin is still a one-file change.
+ *
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+:root {
+	/* Neutrals as alpha overlays: identical rules work on light and dark. */
+	--bwd-line:    rgba(128, 128, 128, .28);   /* borders, dividers */
+	--bwd-line-soft: rgba(128, 128, 128, .16);
+	--bwd-inset:   rgba(128, 128, 128, .07);   /* tracks, insets, hover */
+	--bwd-inset-2: rgba(128, 128, 128, .13);
+	--bwd-grid:    rgba(128, 128, 128, .18);   /* chart grid lines */
+
+	/* Text: primary inherits the theme. --bwd-muted stays a CONCRETE colour here
+	 * because the chart JS reads it off :root for canvas ticks and legends, which
+	 * cannot resolve a relative colour. */
+	--bwd-fg:    inherit;
+	--bwd-muted: #7f7f7f;
+
+	/* OPNsense brand + Bootstrap contextual colours, as the theme defines them. */
+	--bwd-accent:      #C03E14;
+	--bwd-accent-soft: rgba(192, 62, 20, .10);
+	--bwd-negative:    #f05050;
+	--bwd-warning:     #f0ad4e;
+
+	/* Direction: the first two Tableau Classic10 entries, matching core's charts. */
+	--bwd-in:  #1f77b4;   /* download */
+	--bwd-out: #ff7f0e;   /* upload */
+
+	--bwd-radius: 3px;    /* Bootstrap 3 / .label-opnsense */
+}
+
+/* ---------------------------------------------------------------- 1. shell */
+
+.bwd-app {
+	font-size: 13px;
+	line-height: 1.45;
+
+	/* Muted text is derived from the theme's own ink rather than fixed, because no
+	 * single grey clears AA against both themes: #7f7f7f is 4.00:1 on the light
+	 * theme's white and 4.68:1 on the dark theme's #101218, and the best possible
+	 * midpoint (#797979) still only reaches 4.30:1. Taking 70% of the inherited
+	 * ink instead gives 4.75:1 on light and 8.14:1 on dark — both pass.
+	 *
+	 * Declared twice on purpose: a browser without color-mix keeps the first. The
+	 * :root definition above is untouched, so the charts still read a concrete
+	 * colour. */
+	--bwd-muted: #7f7f7f;
+	--bwd-muted: color-mix(in srgb, currentColor 70%, transparent);
+}
+.bwd-app *,
+.bwd-app *:before,
+.bwd-app *:after { box-sizing: border-box; }
+
+/* The UA's [hidden]{display:none} is a zero-specificity rule, so ANY author
+ * display declaration beats it. Several panels below set display:flex, which
+ * silently made hidden a no-op: the Custom From/To row rendered permanently, and
+ * the percentile strip and tag bar left empty padded strips. Every JS toggle in
+ * this app is `el.hidden = true`, so this rule is what makes them work. */
+.bwd-app [hidden] { display: none !important; }
+
+/* OPNsense's .content-box carries no bottom margin (its pages stack one per tab),
+   so the stacked panels here need their own separation. */
+.bwd-app .content-box { margin-bottom: 10px; }
+.bwd-app > .row { margin-bottom: 0; }
+
+/* Numbers line up in columns; OPNsense's face has tabular figures. */
+.bwd-num,
+.bwd-host-nums,
+.bwd-daily-num,
+.bwd-hero-num,
+.bwd-card-v { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+.bwd-banner {
+	padding: 8px 12px;
+	margin-bottom: 10px;
+	border: 1px solid var(--bwd-warning);
+	border-left-width: 4px;
+	border-radius: var(--bwd-radius);
+	background: rgba(240, 173, 78, .12);
+	font-size: 12px;
+}
+
+.bwd-empty,
+.bwd-empty-row {
+	padding: 18px 12px;
+	text-align: center;
+	color: var(--bwd-muted);
+	font-size: 12px;
+}
+
+/* ------------------------------------------------------------- 2. toolbar */
+
+.bwd-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 12px;
+}
+.bwd-windows { display: inline-flex; flex-wrap: nowrap; }
+
+/* Segmented control drawn as a Bootstrap 3 btn-group. */
+.bwd-window {
+	padding: 4px 11px;
+	border: 1px solid var(--bwd-line);
+	border-right-width: 0;
+	background: transparent;
+	color: inherit;
+	font-size: 12px;
+	line-height: 1.5;
+	cursor: pointer;
+	white-space: nowrap;
+}
+.bwd-window:first-child { border-radius: var(--bwd-radius) 0 0 var(--bwd-radius); }
+.bwd-window:last-child {
+	border-right-width: 1px;
+	border-radius: 0 var(--bwd-radius) var(--bwd-radius) 0;
+}
+.bwd-window:hover { background: var(--bwd-inset); }
+.bwd-window.is-active {
+	background: var(--bwd-accent);
+	border-color: var(--bwd-accent);
+	color: #fff;
+}
+.bwd-window.is-active + .bwd-window { border-left-color: var(--bwd-accent); }
+.bwd-window:focus-visible { outline: 2px solid var(--bwd-accent); outline-offset: 1px; }
+
+.bwd-totals {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: auto;
+	flex-wrap: wrap;
+}
+.bwd-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 3px 9px;
+	border: 1px solid var(--bwd-line);
+	border-radius: var(--bwd-radius);
+	font-size: 12px;
+	white-space: nowrap;
+}
+.bwd-pill i {
+	width: 8px; height: 8px;
+	border-radius: 50%;
+	display: inline-block;
+}
+.bwd-pill.bwd-in i  { background: var(--bwd-in); }
+.bwd-pill.bwd-out i { background: var(--bwd-out); }
+.bwd-pill b { font-weight: 600; }
+
+.bwd-export { display: inline-flex; gap: 4px; }
+.bwd-export-btn,
+.bwd-range-reset,
+.bwd-te-btn,
+.bwd-te-close,
+.bwd-tag-edit-btn,
+.bwd-btn {
+	padding: 3px 9px;
+	border: 1px solid var(--bwd-line);
+	border-radius: var(--bwd-radius);
+	background: transparent;
+	color: inherit;
+	font-size: 12px;
+	line-height: 1.5;
+	cursor: pointer;
+}
+.bwd-export-btn:hover,
+.bwd-range-reset:hover,
+.bwd-te-btn:hover,
+.bwd-te-close:hover,
+.bwd-tag-edit-btn:hover,
+.bwd-btn:hover { background: var(--bwd-inset); }
+.bwd-te-save {
+	background: var(--bwd-accent);
+	border-color: var(--bwd-accent);
+	color: #fff;
+}
+.bwd-te-save:hover { filter: brightness(.92); }
+.bwd-probe-btn:disabled { opacity: .55; cursor: default; }
+
+.bwd-updated { font-size: 11px; color: var(--bwd-muted); white-space: nowrap; }
+.bwd-updated.bwd-stale { color: var(--bwd-negative); }
+
+.bwd-customrange {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 12px;
+	font-size: 12px;
+}
+.bwd-range-label { color: var(--bwd-muted); text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
+.bwd-dt { display: inline-flex; align-items: center; gap: 6px; }
+.bwd-app .bwd-dt input {
+	padding: 3px 6px;
+	border: 1px solid var(--bwd-line);
+	border-radius: var(--bwd-radius);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-size: 12px;
+	/* datetime-local paints UA-supplied internals (the calendar icon, the
+	 * segment separators, the picker). Without this they stay light-on-light and
+	 * the field reads as a white box on the dark theme. `light dark` lets the
+	 * browser follow the page it is actually sitting on. */
+	color-scheme: light dark;
+}
+
+/* ------------------------------------------------------------ 3. overview */
+
+.bwd-hero {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 14px 16px;
+}
+.bwd-hero-label {
+	display: block;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	color: var(--bwd-muted);
+	margin-bottom: 2px;
+}
+.bwd-hero-num {
+	display: block;
+	font-size: 34px;
+	font-weight: 300;
+	line-height: 1.05;
+}
+.bwd-hero-sub { font-size: 12px; color: var(--bwd-muted); }
+.bwd-hero-side { display: flex; gap: 22px; }
+.bwd-hero-stat-k {
+	display: block;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	color: var(--bwd-muted);
+}
+.bwd-hero-stat-v { display: block; font-size: 19px; font-weight: 600; }
+.bwd-hero-stat.bwd-in  .bwd-hero-stat-v { color: var(--bwd-in); }
+.bwd-hero-stat.bwd-out .bwd-hero-stat-v { color: var(--bwd-out); }
+
+.bwd-cards { display: flex; flex-wrap: wrap; gap: 0; }
+.bwd-card {
+	flex: 1 1 160px;
+	min-width: 0;
+	padding: 10px 16px;
+	border-top: 1px solid var(--bwd-line-soft);
+	border-right: 1px solid var(--bwd-line-soft);
+}
+.bwd-card:last-child { border-right: 0; }
+.bwd-card-k {
+	display: block;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .05em;
+	color: var(--bwd-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.bwd-card-v { display: block; font-size: 17px; font-weight: 600; margin-top: 1px; }
+.bwd-card-sub { display: block; font-size: 11px; color: var(--bwd-muted); }
+
+.bwd-overview-head,
+.bwd-list-head,
+.bwd-detail-head,
+.bwd-daily-head,
+.bwd-acf-head,
+.bwd-te-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--bwd-line-soft);
+}
+.bwd-overview-title,
+.bwd-proto-title,
+.bwd-daily-title { font-size: 12px; font-weight: 600; }
+.bwd-overview-hint { font-size: 11px; color: var(--bwd-muted); }
+.bwd-overview-canvas { padding: 10px 12px; height: 230px; position: relative; }
+.bwd-chart-wrap { padding: 10px 12px; height: 240px; position: relative; }
+.bwd-overview-canvas canvas, .bwd-chart-wrap canvas { max-height: 100%; }
+
+/* ----------------------------------------------------- 4. host list (table) */
+
+.bwd-list-head { flex-wrap: wrap; }
+.bwd-app .bwd-search {
+	flex: 1 1 150px;
+	min-width: 0;
+	padding: 4px 8px;
+	border: 1px solid var(--bwd-line);
+	border-radius: var(--bwd-radius);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-size: 12px;
+}
+.bwd-viewtoggle { display: inline-flex; }
+.bwd-viewtoggle button,
+.bwd-sort {
+	padding: 3px 9px;
+	border: 1px solid var(--bwd-line);
+	background: transparent;
+	color: inherit;
+	font-size: 11px;
+	cursor: pointer;
+}
+.bwd-viewtoggle button { border-right-width: 0; }
+.bwd-viewtoggle button:first-child { border-radius: var(--bwd-radius) 0 0 var(--bwd-radius); }
+.bwd-viewtoggle button:last-child { border-right-width: 1px; border-radius: 0 var(--bwd-radius) var(--bwd-radius) 0; }
+.bwd-viewtoggle button.is-active,
+.bwd-sort.is-active {
+	background: var(--bwd-accent);
+	border-color: var(--bwd-accent);
+	color: #fff;
+}
+.bwd-sortbar {
+	display: flex;
+	gap: 4px;
+	padding: 6px 12px;
+	border-bottom: 1px solid var(--bwd-line-soft);
+}
+.bwd-sort { border-radius: var(--bwd-radius); }
+.bwd-sort:hover, .bwd-viewtoggle button:hover { background: var(--bwd-inset); }
+.bwd-sort.is-active:hover, .bwd-viewtoggle button.is-active:hover { background: var(--bwd-accent); }
+
+/* The device list reads as an OPNsense data table: striped, hover, condensed. */
+.bwd-hostlist {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	max-height: 560px;
+	overflow-y: auto;
+}
+.bwd-host {
+	position: relative;
+	padding: 6px 12px;
+	border-bottom: 1px solid var(--bwd-line-soft);
+	cursor: pointer;
+}
+.bwd-hostlist > .bwd-host:nth-child(odd) { background: var(--bwd-inset); }
+.bwd-host:hover { background: var(--bwd-inset-2); }
+.bwd-host.is-selected {
+	background: var(--bwd-accent-soft);
+	box-shadow: inset 3px 0 0 var(--bwd-accent);
+}
+.bwd-host-main {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+}
+.bwd-host-label {
+	font-size: 12px;
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.bwd-host-nums { font-size: 11px; white-space: nowrap; text-align: right; }
+.bwd-host-nums .bwd-num + .bwd-num { margin-left: 6px; }
+.bwd-host-nums .bwd-in  { color: var(--bwd-in); }
+.bwd-host-nums .bwd-out { color: var(--bwd-out); }
+.bwd-host-sub {
+	font-size: 11px;
+	color: var(--bwd-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+/* The JS sets this element's own width to the device's share of the busiest
+ * device and emits no child, so it is the FILL, not a track. Positioned along the
+ * row's bottom edge: as a flow element emitted before the label it drew a stray
+ * sliver above the text instead of underlining the row. */
+.bwd-host-bar {
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	height: 2px;
+	background: var(--bwd-accent);
+	opacity: .55;
+	pointer-events: none;
+}
+.bwd-host-total { font-weight: 600; }
+.bwd-model { color: var(--bwd-muted); }
+
+/* ------------------------------------------------------------- 5. badges */
+
+/* Device type + custom tags render as OPNsense labels (.label-opnsense sizing). */
+.bwd-tag,
+.bwd-ctag,
+.bwd-tag-chip {
+	display: inline-block;
+	vertical-align: middle;
+	padding: 1px 6px;
+	border: 1px solid transparent;
+	border-radius: var(--bwd-radius);
+	font-size: 10px;
+	line-height: 1.5;
+	text-transform: uppercase;
+	letter-spacing: .03em;
+	white-space: nowrap;
+}
+.bwd-tag { background: var(--bwd-inset-2); color: inherit; }
+.bwd-ctag {
+	background: transparent;
+	border-color: var(--bwd-line);
+	color: var(--bwd-muted);
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+/* Type tints, kept muted so the table stays calm. */
+.bwd-tag-phone     { background: rgba(31, 119, 180, .16); }
+.bwd-tag-tablet    { background: rgba(23, 190, 207, .16); }
+.bwd-tag-pc        { background: rgba(148, 103, 189, .16); }
+.bwd-tag-tv        { background: rgba(214, 39, 40, .14); }
+.bwd-tag-iot       { background: rgba(44, 160, 44, .16); }
+.bwd-tag-nas       { background: rgba(140, 86, 75, .16); }
+.bwd-tag-network   { background: rgba(255, 127, 14, .16); }
+.bwd-tag-printer   { background: rgba(127, 127, 127, .18); }
+.bwd-tag-camera    { background: rgba(227, 119, 194, .16); }
+.bwd-tag-gaming    { background: rgba(188, 189, 34, .18); }
+.bwd-tag-voip      { background: rgba(49, 112, 143, .16); }
+.bwd-tag-appliance { background: rgba(128, 128, 128, .16); }
+
+.bwd-tagbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	padding: 6px 12px;
+	border-bottom: 1px solid var(--bwd-line-soft);
+}
+.bwd-tag-chip {
+	background: transparent;
+	border-color: var(--bwd-line);
+	cursor: pointer;
+	text-transform: none;
+	letter-spacing: 0;
+	font-size: 11px;
+}
+.bwd-tag-chip:hover { background: var(--bwd-inset); }
+.bwd-tag-chip.is-active {
+	background: var(--bwd-accent);
+	border-color: var(--bwd-accent);
+	color: #fff;
+}
+.bwd-tag-n { opacity: .65; margin-left: 3px; }
+/* Custom (operator) tags stay visually distinct from the auto type tag. */
+.bwd-tag-chip--custom { border-style: dashed; }
+.bwd-tag-chip--custom.is-active { border-style: solid; }
+.bwd-tag-summary { font-size: 11px; color: var(--bwd-muted); padding: 0 12px 6px; }
+.bwd-tag-edit-btn { margin-left: auto; }
+
+/* -------------------------------------------------------- 6. detail pane */
+
+.bwd-detail-head { align-items: flex-start; flex-wrap: wrap; }
+.bwd-detail-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.bwd-detail-sub { font-size: 11px; color: var(--bwd-muted); }
+.bwd-detail-stats { display: flex; gap: 18px; text-align: right; }
+.bwd-stat { font-size: 11px; }
+.bwd-stat .bwd-stat-k { color: var(--bwd-muted); }
+.bwd-stat i {
+	display: inline-block;
+	width: 7px; height: 7px;
+	border-radius: 50%;
+	margin-right: 4px;
+	background: var(--bwd-muted);
+}
+.bwd-stat.bwd-in i  { background: var(--bwd-in); }
+.bwd-stat.bwd-out i { background: var(--bwd-out); }
+/* Deliberately NOT `color: inherit`: the label beside it is muted, and inheriting
+ * that made the headline In/Out/Total numbers render grey. */
+.bwd-stat b { display: block; font-size: 15px; font-weight: 600; }
+.bwd-stat.bwd-in b  { color: var(--bwd-in); }
+.bwd-stat.bwd-out b { color: var(--bwd-out); }
+
+.bwd-pctile {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	flex-wrap: wrap;
+	padding: 7px 12px;
+	border-bottom: 1px solid var(--bwd-line-soft);
+	background: var(--bwd-inset);
+	font-size: 11px;
+}
+.bwd-pctile-k { text-transform: uppercase; letter-spacing: .05em; color: var(--bwd-muted); }
+.bwd-pctile-v { font-size: 15px; font-weight: 600; }
+.bwd-pctile-sub { color: var(--bwd-muted); }
+
+.bwd-proto { padding: 10px 12px; border-top: 1px solid var(--bwd-line-soft); }
+.bwd-proto-bar {
+	display: flex;
+	height: 8px;
+	border-radius: var(--bwd-radius);
+	overflow: hidden;
+	margin: 6px 0;
+	background: var(--bwd-inset-2);
+}
+.bwd-proto-bar > span { display: block; height: 100%; }
+.bwd-proto-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 14px;
+	font-size: 11px;
+	color: var(--bwd-muted);
+}
+.bwd-proto-legend i {
+	width: 8px; height: 8px;
+	border-radius: 2px;
+	display: inline-block;
+	margin-right: 4px;
+	vertical-align: middle;
+}
+
+/* --------------------------------------------------------- 7. day ledger */
+
+.bwd-daily { border-top: 1px solid var(--bwd-line-soft); }
+.bwd-daily-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+.bwd-daily-tbl th {
+	text-align: left;
+	font-weight: 600;
+	color: var(--bwd-muted);
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	font-size: 10px;
+	padding: 5px 12px;
+	border-bottom: 1px solid var(--bwd-line-soft);
+}
+.bwd-daily-tbl td { padding: 4px 12px; border-bottom: 1px solid var(--bwd-line-soft); }
+.bwd-daily-tbl tr:nth-child(odd) td { background: var(--bwd-inset); }
+.bwd-daily-num { text-align: right; white-space: nowrap; }
+.bwd-daily-date { white-space: nowrap; }
+.bwd-daily-tot { font-weight: 600; }
+.bwd-daily-barcell { width: 40%; min-width: 90px; }
+/* The JS gives this span the day's share as an inline width and fills it with two
+ * <i> children split in/out; styling `> span` matched nothing, so the split was
+ * invisible and every day looked like one flat grey bar. */
+.bwd-daily-bar { height: 6px; border-radius: 1px; overflow: hidden; display: flex; }
+.bwd-daily-bar > i { display: block; height: 100%; }
+.bwd-daily-bar > i.bwd-in { background: var(--bwd-in); }
+.bwd-daily-bar > i.bwd-out { background: var(--bwd-out); }
+.bwd-daily-barcell > .bwd-daily-bar { min-width: 2px; }
+.bwd-daily-more {
+	display: block;
+	width: 100%;
+	padding: 5px;
+	border: 0;
+	border-top: 1px solid var(--bwd-line-soft);
+	background: transparent;
+	color: var(--bwd-accent);
+	font-size: 11px;
+	cursor: pointer;
+}
+.bwd-daily-more:hover { background: var(--bwd-inset); }
+.bwd-daily-sub { font-size: 11px; color: var(--bwd-muted); }
+
+/* ------------------------------------------------- 8. editors (override) */
+
+.bwd-alertcfg, .bwd-tageditor { border-top: 1px solid var(--bwd-line-soft); }
+.bwd-acf-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 8px 12px;
+	padding: 10px 12px;
+}
+.bwd-acf-field { display: flex; flex-direction: column; gap: 3px; }
+.bwd-acf-field--wide { grid-column: 1 / -1; }
+.bwd-acf-key { font-size: 11px; color: var(--bwd-muted); }
+.bwd-app .bwd-acf-field input,
+.bwd-app .bwd-acf-field select {
+	padding: 3px 6px;
+	border: 1px solid var(--bwd-line);
+	border-radius: var(--bwd-radius);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-size: 12px;
+}
+.bwd-acf-field option { color: initial; }
+.bwd-acf-hint { font-size: 11px; color: var(--bwd-muted); }
+.bwd-acf-actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 0 12px 10px;
+}
+.bwd-acf-msg { font-size: 11px; color: var(--bwd-muted); }
+
+.bwd-te-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 12px;
+	border-bottom: 1px solid var(--bwd-line-soft);
+	font-size: 12px;
+}
+.bwd-te-n { color: var(--bwd-muted); font-size: 11px; }
+.bwd-app .bwd-te-row input {
+	padding: 2px 6px;
+	border: 1px solid var(--bwd-line);
+	border-radius: var(--bwd-radius);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-size: 12px;
+}
+.bwd-te-del { color: var(--bwd-negative); border-color: var(--bwd-line); }
+.bwd-te-body { max-height: 260px; overflow-y: auto; }
+.bwd-te-empty { padding: 10px 12px; font-size: 11px; color: var(--bwd-muted); }
+.bwd-te-msg { margin-left: auto; font-size: 11px; color: var(--bwd-muted); }
+.bwd-te-msg.is-error { color: var(--bwd-negative); }
+.bwd-te-close { margin-left: 8px; }
+
+/* ------------------------------------------------------- 9. entrance, a11y */
+
+.bwd-reveal { animation: bwd-fade .18s ease-out both; }
+.bwd-reveal-1 { animation-delay: .02s; }
+.bwd-reveal-2 { animation-delay: .04s; }
+.bwd-reveal-3 { animation-delay: .06s; }
+@keyframes bwd-fade { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+	.bwd-reveal { animation: none; }
+	.bwd-app * { transition: none !important; }
+}
+
+/* ------------------------------------------------------------ 10. phone */
+
+@media (max-width: 767px) {
+	.bwd-toolbar { padding: 8px; }
+	/* The window strip scrolls rather than widening the page: an inline-flex
+	   control's automatic min-width would otherwise force the whole sheet wider
+	   than the viewport and produce horizontal overflow. */
+	.bwd-windows {
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+		min-width: 0;
+		max-width: 100%;
+		/* Scrollable, but without a scrollbar sitting under the control. */
+		scrollbar-width: none;
+		-ms-overflow-style: none;
+	}
+	.bwd-windows::-webkit-scrollbar { display: none; }
+	.bwd-totals { margin-left: 0; }
+	.bwd-hero { padding: 12px; }
+	.bwd-hero-num { font-size: 27px; }
+	.bwd-hero-side { gap: 16px; }
+	.bwd-card { flex-basis: 50%; border-right: 0; }
+	.bwd-detail-stats { gap: 12px; }
+	.bwd-hostlist { max-height: 320px; }
+	.bwd-overview-canvas, .bwd-chart-wrap { height: 190px; }
+	.bwd-daily-barcell,
+	.bwd-daily-barhead { display: none; }   /* header and cells together, or the row widths disagree */
+}

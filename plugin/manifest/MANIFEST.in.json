@@ -1,0 +1,29 @@
+{
+	"name": "os-bandwidthd",
+	"origin": "opnsense/os-bandwidthd",
+	"version": "@@PLUGIN_VERSION@@",
+	"comment": "Per-device bandwidth accounting, alerting and history",
+	"maintainer": "@@MAINTAINER@@",
+	"www": "https://gogs.ioakeim.com/sioakim/opnsense-bandwidthd",
+	"abi": "@@ABI@@",
+	"prefix": "/usr/local",
+	"licenselogic": "single",
+	"licenses": [
+		"APACHE20"
+	],
+	"categories": [
+		"net-mgmt"
+	],
+	"desc": "An OPNsense plugin around the bandwidthd capture daemon.\n\nAdds an interactive Reporting dashboard (per-device usage, stacked top-talker\ncharts, 95th-percentile, per-day ledger, CSV/JSON export), a traffic alerting\nengine (quota, anomaly, exfiltration and new-device rules), a multi-signal\ndevice classifier with optional active fingerprinting, and an optional external\nPostgreSQL history backend.\n\nDevice identity is keyed by MAC, so a device that changes IP through a DHCP\nlease renewal stays one device.",
+	"deps": {
+		"bandwidthd": {
+			"origin": "net-mgmt/bandwidthd",
+			"version": "@@BWD_VERSION@@"
+		}
+	},
+	"scripts": {
+		"post-install": "#!/bin/sh\n# Register the new MVC controllers, ACL, menu, cron hooks and configd actions.\n# The menu and ACL are read from a cache that installing files does NOT\n# invalidate, so without the flush the plugin installs correctly and is simply\n# absent from the navigation.\n/usr/local/etc/rc.d/configd restart >/dev/null 2>&1 || true\n/usr/local/sbin/pluginctl -c cache_flush >/dev/null 2>&1 || true\n# system_cron_configure() writes the crontab; plugins_configure('cron') is a\n# no-op ('cron' is not a plugin hook) and needs the full bootstrap anyway.\n/usr/local/bin/php -r 'require_once(\"config.inc\"); require_once(\"util.inc\"); require_once(\"legacy_bindings.inc\"); require_once(\"system.inc\"); require_once(\"interfaces.inc\"); require_once(\"plugins.inc\"); system_cron_configure();' >/dev/null 2>&1 || true\n# Render the service template so /etc/rc.conf.d/bandwidthd exists immediately;\n# otherwise it only appears on the first settings save, and a reboot before\n# that leaves the daemon disabled at boot.\n/usr/local/sbin/configctl template reload OPNsense/Bandwidthd >/dev/null 2>&1 || true\n/usr/local/sbin/configctl webgui restart >/dev/null 2>&1 || true\nexit 0\n",
+		"post-deinstall": "#!/bin/sh\n# Drop this plugin's cron entries: they invoke configd actions that no longer\n# exist and would keep erroring every few minutes. The hook file is already\n# gone at this point, so regenerating simply omits them.\n/usr/local/etc/rc.d/configd restart >/dev/null 2>&1 || true\n/usr/local/bin/php -r 'require_once(\"config.inc\"); require_once(\"util.inc\"); require_once(\"legacy_bindings.inc\"); require_once(\"system.inc\"); require_once(\"interfaces.inc\"); require_once(\"plugins.inc\"); system_cron_configure();' >/dev/null 2>&1 || true\n/usr/local/sbin/pluginctl -c cache_flush >/dev/null 2>&1 || true\n# The rendered rc.conf.d file is template output, not a package file, so pkg\n# leaves it behind enabling a service that no longer exists.\nrm -f /etc/rc.conf.d/bandwidthd\n/usr/local/sbin/configctl webgui restart >/dev/null 2>&1 || true\nexit 0\n",
+		"pre-deinstall": "#!/bin/sh\n# Stop the daemon while the rc script this package owns still exists: pkg\n# removes the package files before post-deinstall runs, so a stop there is a\n# silent no-op and bandwidthd keeps capturing with nothing left to stop it.\n/usr/local/etc/rc.d/bandwidthd onestop >/dev/null 2>&1 || /usr/bin/killall bandwidthd >/dev/null 2>&1 || true\nexit 0\n"
+	}
+}

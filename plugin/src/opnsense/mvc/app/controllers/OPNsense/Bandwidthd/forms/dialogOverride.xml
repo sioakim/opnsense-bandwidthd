@@ -1,0 +1,52 @@
+<form>
+    <field>
+        <id>override.match</id>
+        <label>Match</label>
+        <type>text</type>
+        <help>The device's MAC address (preferred — survives DHCP changes) or its IPv4 address.</help>
+    </field>
+    <field>
+        <id>override.name</id>
+        <label>Name</label>
+        <type>text</type>
+        <help>Display name, overriding whatever DHCP/DNS reports.</help>
+    </field>
+    <field>
+        <id>override.vendor</id>
+        <label>Vendor</label>
+        <type>text</type>
+        <help>Display vendor, overriding the OUI lookup and any probe result.</help>
+    </field>
+    <field>
+        <id>override.tag</id>
+        <label>Type tag</label>
+        <type>text</type>
+        <help>Device type, e.g. phone, laptop, iot. "auto" leaves it to the classifier.</help>
+    </field>
+    <field>
+        <id>override.quota_host_gb</id>
+        <label>Daily quota (GB)</label>
+        <type>text</type>
+        <help>Per-device daily quota. Blank inherits the global setting.</help>
+    </field>
+    <field>
+        <id>override.alerts_enable</id>
+        <label>Alerts</label>
+        <type>dropdown</type>
+    </field>
+    <field>
+        <id>override.anomaly_enable</id>
+        <label>Anomaly detection</label>
+        <type>dropdown</type>
+    </field>
+    <field>
+        <id>override.exfil_enable</id>
+        <label>Exfiltration heuristic</label>
+        <type>dropdown</type>
+    </field>
+    <field>
+        <id>override.newdevice_enable</id>
+        <label>New device alert</label>
+        <type>dropdown</type>
+    </field>
+</form>

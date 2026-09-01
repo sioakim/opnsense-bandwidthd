@@ -1,0 +1,12 @@
+# expected_tag <TAB> hostname <TAB> vendor — clear hostname/vendor signals that
+# classify deterministically off-box (config-dependent signals are stubbed empty).
+phone	iphone-12	Apple
+pc	macbook-pro	Apple
+iot	shelly-plug-s	Espressif
+camera	reolink-doorbell	Reolink
+nas	synology-ds220	Synology
+tv	chromecast-ultra	Google
+gaming	xbox-one	Microsoft
+printer	brother-mfc-l2710	Brother
+network	unifi-ap-lr	Ubiquiti
+tablet	ipad-air	Apple

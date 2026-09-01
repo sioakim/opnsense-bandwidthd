@@ -1,0 +1,8 @@
+dist/
+_staging/
+.DS_Store
+._*
+CLAUDE.local.md
+
+# OPNsense theme stylesheets fetched for the harness (their code, not ours)
+tests/harness/opnsense-*.css

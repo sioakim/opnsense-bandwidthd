@@ -1,0 +1,12 @@
+An OPNsense plugin around the bandwidthd capture daemon.
+
+Adds an interactive Reporting dashboard (per-device usage, stacked top-talker
+charts, 95th-percentile, per-day ledger, CSV/JSON export), a traffic alerting
+engine (quota, anomaly, exfiltration and new-device rules), a multi-signal
+device classifier with optional active fingerprinting, and an optional external
+PostgreSQL history backend.
+
+Device identity is keyed by MAC, so a device that changes IP through a DHCP
+lease renewal stays one device.
+
+WWW: https://gogs.ioakeim.com/sioakim/opnsense-bandwidthd

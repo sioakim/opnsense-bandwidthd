@@ -1,0 +1,35 @@
+<acl>
+    <!--
+      Two roles. The dashboard is read-only on purpose: its inline editors (device
+      overrides, the tag tool, the probe button) change configuration or actively
+      scan the LAN, so they belong to the Services privilege, not to "may look at
+      traffic graphs".
+
+      Patterns are matched against the request path, so the read grant lists the
+      read endpoints explicitly. A wildcard over api/bandwidthd/data/* would also
+      hand out setOverride, renameTag, deleteTag and probe.
+    -->
+    <page-status-bandwidthd>
+        <name>Status: BandwidthD</name>
+        <patterns>
+            <pattern>ui/bandwidthd/dashboard*</pattern>
+            <pattern>api/bandwidthd/data/hosts</pattern>
+            <pattern>api/bandwidthd/data/series</pattern>
+            <pattern>api/bandwidthd/data/percentile</pattern>
+            <pattern>api/bandwidthd/data/daily</pattern>
+            <pattern>api/bandwidthd/data/overview</pattern>
+            <pattern>api/bandwidthd/data/tags</pattern>
+            <pattern>api/bandwidthd/data/status</pattern>
+            <pattern>api/bandwidthd/data/override</pattern>
+            <pattern>api/bandwidthd/data/export</pattern>
+            <pattern>api/bandwidthd/service/status</pattern>
+        </patterns>
+    </page-status-bandwidthd>
+    <page-services-bandwidthd>
+        <name>Services: BandwidthD</name>
+        <patterns>
+            <pattern>ui/bandwidthd/*</pattern>
+            <pattern>api/bandwidthd/*</pattern>
+        </patterns>
+    </page-services-bandwidthd>
+</acl>

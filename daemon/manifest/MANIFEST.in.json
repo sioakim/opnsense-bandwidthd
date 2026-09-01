@@ -1,0 +1,17 @@
+{
+	"name": "bandwidthd",
+	"origin": "net-mgmt/bandwidthd",
+	"version": "@@BWD_VERSION@@",
+	"comment": "Tracks bandwidth usage by IP address",
+	"maintainer": "@@MAINTAINER@@",
+	"www": "https://gogs.ioakeim.com/sioakim/opnsense-bandwidthd",
+	"abi": "@@ABI@@",
+	"prefix": "/usr/local",
+	"licenselogic": "single",
+	"licenses": ["GPLv3+"],
+	"categories": ["net-mgmt"],
+	"desc": "bandwidthd tracks usage of TCP/IP network subnets and logs per-IP traffic as a\nCDF time series (and optionally renders HTML graphs). It color codes HTTP, TCP,\nUDP, ICMP, VPN and P2P traffic. Unlike MRTG it tracks each individual IP address\nrather than the status of a link.\n\nRepackaged from the unmaintained FreeBSD net-mgmt/bandwidthd port for OPNsense,\nwhose package repository does not carry it.",
+	"deps": {
+		"libgd": {"origin": "graphics/gd", "version": "@@LIBGD_VERSION@@"}
+	}
+}
