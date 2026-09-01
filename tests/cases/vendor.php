@@ -26,13 +26,13 @@ t_ok($ouiFile && is_file($ouiFile), 'bundled oui.tsv is present');
 if ($ouiFile && is_file($ouiFile)) {
 	$first = fgets(fopen($ouiFile, 'r'));
 	$cols = explode("\t", trim($first));
+	// These used to be silent guards, which let the assertions below pass vacuously.
+	t_ok(count($cols) >= 2 && strlen($cols[0]) === 6, 'first oui.tsv row is <6 hex>\t<vendor>');
 	if (count($cols) >= 2 && strlen($cols[0]) === 6) {
 		$mac = strtolower(substr($cols[0], 0, 2) . ':' . substr($cols[0], 2, 2) . ':' . substr($cols[0], 4, 2)) . ':00:00:01';
 		$v = bwd_vendor($mac);
-		// guard: only assert when the synthesized MAC isn't accidentally locally-administered
-		if (!$v['randomized']) {
-			t_eq($cols[1], $v['vendor'], 'OUI ' . $cols[0] . ' resolves to ' . $cols[1]);
-			t_eq(strtoupper($cols[0]), $v['oui'], 'OUI hex parsed');
-		}
+		t_ok(!$v['randomized'], 'synthesised MAC from the first OUI is not locally administered');
+		t_eq($cols[1], $v['vendor'], 'OUI ' . $cols[0] . ' resolves to ' . $cols[1]);
+		t_eq(strtoupper($cols[0]), $v['oui'], 'OUI hex parsed');
 	}
 }

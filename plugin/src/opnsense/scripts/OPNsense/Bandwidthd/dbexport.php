@@ -31,7 +31,6 @@ require_once(__DIR__ . '/lib/bwd_platform.inc.php');
 require_once(__DIR__ . '/lib/bwd_data.inc.php');
 require_once(__DIR__ . '/lib/bwd_db.inc.php');
 
-define('BWD_ROLLUP', BWD_BASE . '/rollups/daily.json');
 define('BWD_SPOOL', BWD_BASE . '/rollups/dbexport_spool.ndjson');
 define('BWD_EXPORT_STATE', BWD_BASE . '/rollups/dbexport_state.json');
 define('BWD_LOCK', BWD_BASE . '/rollups/dbexport.lock');

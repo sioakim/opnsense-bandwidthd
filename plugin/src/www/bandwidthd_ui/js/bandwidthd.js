@@ -965,6 +965,7 @@
 	// showed no Probe button until the user clicked another device.
 	function checkStatus() {
 		return api({ action: 'status' }).then(function (s) {
+			var hadProbe = state.probeEnabled;
 			state.probeEnabled = !!s.probe;
 			var b = el('#bwd-banner');
 			if (!s.enabled) {
@@ -976,8 +977,10 @@
 			} else {
 				b.hidden = true;
 			}
-			// see the note above checkStatus()
-			if (state.selected) { selectHost(state.selected); }
+			// see the note above checkStatus(). Only when the answer changed: on the
+			// 60 s tick a blind re-select rebuilt the override editor (discarding
+			// whatever was being typed) and re-collapsed the daily table every minute.
+			if (state.selected && hadProbe !== state.probeEnabled) { selectHost(state.selected); }
 		}).catch(function () {});
 	}
 
@@ -1079,11 +1082,15 @@
 		checkStatus();
 		loadOverview();
 		loadHosts();
-		setInterval(function () {
+		function tick() {
 			checkStatus();
 			loadOverview();
 			loadHosts().then(function () { if (state.selected) { refreshSelected(); } });
-		}, 60000);
+		}
+		// A background tab must not cost the firewall a full CDF scan per endpoint
+		// every minute; catch up once when it becomes visible again.
+		setInterval(function () { if (!document.hidden) { tick(); } }, 60000);
+		document.addEventListener('visibilitychange', function () { if (!document.hidden) { tick(); } });
 	}
 
 	if (document.readyState !== 'loading') { init(); }

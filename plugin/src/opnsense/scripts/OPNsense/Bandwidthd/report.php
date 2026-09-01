@@ -19,10 +19,6 @@
 require_once(__DIR__ . '/lib/bwd_platform.inc.php');
 require_once(__DIR__ . '/lib/bwd_data.inc.php');
 
-define('BWD_ROLLUP_DIR', BWD_BASE . '/rollups');
-define('BWD_ROLLUP', BWD_ROLLUP_DIR . '/daily.json');
-define('BWD_ALERT_STATE', BWD_ROLLUP_DIR . '/alert_state.json');
-define('GB', 1073741824.0);
 
 $DRY = in_array('--dry-run', $argv, true) || in_array('-n', $argv, true);
 $winOverride = '';

@@ -262,7 +262,11 @@ class DataController extends ApiControllerBase
         if (!bwd_fp_target_allowed($ip)) {
             return ['error' => 'ip is outside the monitored subnets'];
         }
-        $res = bwd_fp_identify_device($ip);
+        /* fast: HTTP + TLS with 2 s timeouts. The full probe (mDNS, SSDP, banners,
+         * nmap) against a host that silently drops packets waits out every
+         * timeout — well over a minute inside a php-cgi request. It stays
+         * available from the CLI (probe.php --ip). */
+        $res = bwd_fp_identify_device($ip, array('fast' => true));
         $mac = bwd_macmap()[$ip] ?? '';
         return bwd_fp_store($mac, $ip, $res);
     }

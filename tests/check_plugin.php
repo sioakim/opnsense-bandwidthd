@@ -544,6 +544,20 @@ foreach (glob("$root/tests/harness/*.json") ?: [] as $f) {
 ok(in_array('CLAUDE.local.md', array_map('trim', file("$root/.gitignore")), true),
     '.gitignore excludes CLAUDE.local.md');
 
+/* 11b. The alerts job is the only writer of the rollup the report reads, and the
+ *      per-device "alerts: on" override needs it while the global switch is off.
+ *      Gating the job on alerts_enable alone shipped an empty daily report. */
+$hookSrc = file_get_contents("$src/etc/inc/plugins.inc.d/bandwidthd.inc");
+ok(preg_match('/if \(bandwidthd_rollup_wanted\(\)\)\s*\{[^}]*bandwidthd alerts/s', $hookSrc) === 1,
+    'the alerts cron job is gated on bandwidthd_rollup_wanted(), not alerts_enable alone');
+ok(preg_match('/function bandwidthd_rollup_wanted\(\).*?report_enable.*?alerts_enable.*?\n\}/s', $hookSrc) === 1,
+    'bandwidthd_rollup_wanted() considers report_enable and the per-device alerts override');
+/* 11c. The prebuilt daemon binary is a shipped artefact: a changed checksum is a
+ *      deliberate, reviewed rebuild, never a silent one. */
+$binSha = hash_file('sha256', "$root/daemon/prebuilt/usr/local/bandwidthd/bandwidthd");
+ok(strpos(file_get_contents("$root/daemon/README.md"), $binSha) !== false,
+    'daemon/README.md records the sha256 of the committed bandwidthd binary');
+
 /* 12. The package repository under repo/: the fingerprint clients install must be the
  *     sha256 of the committed public key (that is what pkg(8) checks a signed
  *     catalogue against), and the repo config must name that fingerprint directory. */

@@ -128,7 +128,7 @@ function bwd_atomic_write_raw($file, $contents) {
 	$tmp = @tempnam(dirname($file), '.bwd');
 	if ($tmp === false) { return false; }
 	if (@file_put_contents($tmp, $contents) === false) { @unlink($tmp); return false; }
-	@chmod($tmp, 0644);
+	@chmod($tmp, 0600);
 	if (!@rename($tmp, $file)) { @unlink($tmp); return false; }
 	return true;
 }

@@ -19,11 +19,6 @@
 require_once(__DIR__ . '/lib/bwd_platform.inc.php');
 require_once(__DIR__ . '/lib/bwd_data.inc.php');
 
-define('BWD_ROLLUP_DIR', BWD_BASE . '/rollups');
-define('BWD_ROLLUP', BWD_ROLLUP_DIR . '/daily.json');
-define('BWD_ALERT_STATE', BWD_ROLLUP_DIR . '/alert_state.json');
-define('GB', 1073741824.0);
-define('MB', 1048576.0);
 
 $DRY = in_array('--dry-run', $argv, true) || in_array('-n', $argv, true);
 
@@ -184,7 +179,7 @@ if ($gArmed === 'on' || $anyHostArmed) {
 	}
 	// (2) anomaly vs trailing-7-day baseline (global default, per-host override)
 	$gAnomaly = bwd_flag('anomaly_enable');
-	$k = (float) bwd_cfg('anomaly_factor', 3); if ($k < 1.5) { $k = 3; }
+	$k = (float) bwd_cfg('anomaly_factor', 3); if ($k < 1.5) { $k = 1.5; }   // the form says so
 	$floor = 500 * MB;
 	foreach ($dev24 as $key => $d) {
 		if (!$armed($d) || dev_cfg($d, 'anomaly_enable', $gAnomaly) !== 'on') { continue; }

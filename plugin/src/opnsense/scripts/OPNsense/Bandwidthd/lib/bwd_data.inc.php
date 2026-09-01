@@ -61,11 +61,14 @@ function bwd_atomic_write($file, $contents) {
 	 * 0, so the rename would replace the state file with an empty one. */
 	if (!is_string($contents)) { return false; }
 	$dir = dirname($file);
-	if (!is_dir($dir)) { @mkdir($dir, 0755, true); }
+	if (!is_dir($dir)) { @mkdir($dir, 0700, true); }
 	$tmp = @tempnam($dir, '.bwd');
 	if ($tmp === false) { return false; }
 	if (@file_put_contents($tmp, $contents) === false) { @unlink($tmp); return false; }
-	@chmod($tmp, 0644);   // tempnam creates 0600; these are read by both root cron and the www GUI
+	/* The rollups are the household's device inventory (names, open ports, TLS
+	 * subjects). Every reader — the GUI's php-cgi, configd, cron — runs as root
+	 * on OPNsense, so owner-only is enough and anything else is exposure. */
+	@chmod($tmp, 0600);
 	if (!@rename($tmp, $file)) { @unlink($tmp); return false; }
 	return true;
 }
@@ -76,6 +79,15 @@ function bwd_atomic_write($file, $contents) {
 function bwd_json($value, $flags = 0) {
 	return json_encode($value, $flags | JSON_INVALID_UTF8_SUBSTITUTE);
 }
+
+/* Durable state shared by the cron scripts (alerts writes the rollup, report and
+ * dbexport read it). Defined once here so no two scripts can disagree on a path. */
+if (!defined('BWD_ROLLUP_DIR')) { define('BWD_ROLLUP_DIR', BWD_BASE . '/rollups'); }
+if (!defined('BWD_ROLLUP')) { define('BWD_ROLLUP', BWD_ROLLUP_DIR . '/daily.json'); }
+if (!defined('BWD_ALERT_STATE')) { define('BWD_ALERT_STATE', BWD_ROLLUP_DIR . '/alert_state.json'); }
+/* Binary units: quotas and the report divide by 1024, so a "GB" here is a GiB. */
+if (!defined('GB')) { define('GB', 1073741824.0); }
+if (!defined('MB')) { define('MB', 1048576.0); }
 
 /* Empty per-host accumulator. */
 function bwd_blank_host($ip) {
@@ -1173,6 +1185,28 @@ function bwd_overview($period, $from = 0, $to = 0, $topn = 8, $tags = array()) {
 	);
 }
 
+/* Per-sample rates for the percentile population, with the silent intervals put
+ * back. bandwidthd writes a row only for an interval in which the IP moved
+ * traffic, so a quiet device's sample list has gaps (on one live box 38 of 148
+ * hosts had rows for under a quarter of the intervals). Those gaps are real
+ * zero-rate samples; leaving them out made a bursty device's p95 read as its
+ * burst rate. Points are ascending in t. */
+function bwd_pct_population($pts, $interval) {
+	$ins = array(); $outs = array(); $tots = array();
+	foreach ($pts as $p) {
+		$ins[]  = $p['in']  * 8 / $interval;
+		$outs[] = $p['out'] * 8 / $interval;
+		$tots[] = ($p['in'] + $p['out']) * 8 / $interval;
+	}
+	$n = count($pts);
+	if ($n >= 2 && $interval > 0) {
+		$span = $pts[$n - 1]['t'] - $pts[0]['t'];
+		$missing = intdiv((int) $span, (int) $interval) + 1 - $n;
+		for ($i = 0; $i < $missing; $i++) { $ins[] = 0.0; $outs[] = 0.0; $tots[] = 0.0; }
+	}
+	return array($ins, $outs, $tots);
+}
+
 /* Linear-interpolated percentile of a numeric array (e.g. 95 -> 95th). */
 function bwd_pctile($arr, $pct) {
 	$n = count($arr);
@@ -1210,12 +1244,7 @@ function bwd_percentile($ip, $period, $from = 0, $to = 0, $pct = 95, $tags = arr
 	sort($deltas);
 	$interval = $deltas[intdiv(count($deltas), 2)];   // median gap
 	if ($interval <= 0) { return $res; }
-	$ins = array(); $outs = array(); $tots = array();
-	foreach ($pts as $p) {
-		$ins[]  = $p['in']  * 8 / $interval;
-		$outs[] = $p['out'] * 8 / $interval;
-		$tots[] = ($p['in'] + $p['out']) * 8 / $interval;
-	}
+	list($ins, $outs, $tots) = bwd_pct_population($pts, $interval);
 	$res['interval']  = $interval;
 	$res['in_bps']    = bwd_pctile($ins, $pct);
 	$res['out_bps']   = bwd_pctile($outs, $pct);
