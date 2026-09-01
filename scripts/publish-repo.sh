@@ -71,7 +71,7 @@ if git -C "${SITE}" diff --cached --quiet; then
 	log "site unchanged — nothing to publish"
 	exit 0
 fi
-git -C "${SITE}" commit -q -m "Publish os-bandwidthd ${VERSION} ($(echo ${ABIS} | tr ' ' ','))"
+git -C "${SITE}" commit -q -m "Publish os-bandwidthd ${VERSION} ($(echo "${ABIS}" | tr ' ' ','))"
 git -C "${SITE}" push -q "${GH_REMOTE}" "HEAD:refs/heads/${PAGES_BRANCH}"
 
 # A quiet push hides a rejection; compare the refs explicitly.

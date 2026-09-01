@@ -12,19 +12,59 @@ dashboard, alerting engine, classifier and fingerprint engine are
 platform-independent and run off-box under the test suite. `docs/PLATFORM.md`
 records the OPNsense behaviour the plugin depends on — most of it undocumented.
 
-## Installing
+## Installing on an OPNsense box
 
-On the firewall, as root:
+Requires OPNsense 26.7 or later on amd64 and a root shell (SSH, or the
+console). The plugin comes from a signed package repository, so once the
+repository is known it installs and upgrades like any other plugin.
+
+**1. Add the repository** — as root on the firewall:
 
 ```sh
 fetch -o - https://sioakim.github.io/opnsense-bandwidthd/install-repo.sh | sh
 ```
 
-That adds a signed package repository. Then install **os-bandwidthd** from
-*System → Firmware → Plugins*, or with `pkg install os-bandwidthd`; it pulls in
-the `bandwidthd` daemon and `libgd`. The manual steps, what gets installed and
-building from source are in `docs/INSTALL.md`; how the repository itself works is
-in `docs/REPOSITORY.md`.
+This writes the signing fingerprint to `/usr/local/etc/pkg/fingerprints/bandwidthd/`
+and the repository definition to `/usr/local/etc/pkg/repos/bandwidthd.conf`,
+then refreshes the catalogue. Every download is verified against that
+fingerprint. The equivalent manual commands are on the [repository page][repo].
+
+**2. Install the plugin** — in the GUI under **System → Firmware → Plugins**
+(`os-bandwidthd` is listed with the others; click **+**), or:
+
+```sh
+pkg install os-bandwidthd
+```
+
+The `bandwidthd` daemon and `libgd` come in as dependencies. Reload the GUI
+afterwards so the new menu entries appear.
+
+**3. Turn it on** — **Services → BandwidthD → Settings**: tick *Enable*, pick
+the interface to watch (usually LAN), save. Leave *Log CDF data* on — it is
+what the dashboard reads.
+
+**4. Look at it** — **Reporting → BandwidthD**. Data appears about 2–3 minutes
+after the daemon starts, at its first flush. Alerts, the scheduled report,
+active fingerprinting and the external history database are optional and off
+by default; `docs/INSTALL.md` describes each.
+
+**Upgrading** happens through the normal firmware flow — **System → Firmware →
+Updates** — or `pkg upgrade`. **Removing**: `pkg delete os-bandwidthd bandwidthd`;
+settings stay in `config.xml` and history stays under `/usr/local/bandwidthd/`
+until you delete it. To forget the repository too, remove the two files step 1
+created.
+
+**If something looks wrong**
+
+- Menu entries missing although `/ui/bandwidthd/dashboard` loads: the GUI's
+  menu cache is stale — `pluginctl -c cache_flush`, then reload the page.
+- `pkg update` reports the `bandwidthd` repository as unavailable after a major
+  OPNsense upgrade: the package ABI changed and a build for it is not published
+  yet. Nothing else is affected.
+- Packages installed from a source build show `unknown-repository` in
+  `pkg query %R`; `pkg install -f os-bandwidthd bandwidthd` re-associates them.
+
+[repo]: https://sioakim.github.io/opnsense-bandwidthd/
 
 ## What it does
 
@@ -54,18 +94,6 @@ whether a device is a phone or a laptop, so the hostname decides.
 
 **API** — the same endpoints the dashboard uses are available to scripts under
 `/api/bandwidthd/data/*`, authenticated by OPNsense with an API key.
-
-## Install
-
-Requires OPNsense 26.7+ on amd64. On the box:
-
-```sh
-sh scripts/build-pkgs.sh
-sh scripts/install.sh
-```
-
-Then enable it under **Services → BandwidthD → Settings** and open
-**Reporting → BandwidthD**. Full details in `docs/INSTALL.md`.
 
 ## Repository layout
 

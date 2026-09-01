@@ -298,6 +298,10 @@ ok(strpos($installSh, 'template reload OPNsense/Bandwidthd') !== false,
     'install.sh renders the service template (boot enable exists immediately)');
 ok(strpos($manifest['scripts']['post-install'] ?? '', 'template reload OPNsense/Bandwidthd') !== false,
     'post-install renders the service template');
+/* pre-deinstall stops the daemon; on an upgrade only post-install can start it
+ * again, otherwise capture silently stays down until a reboot. */
+ok(strpos($manifest['scripts']['post-install'] ?? '', '/usr/local/etc/rc.d/bandwidthd start') !== false,
+    'post-install starts the daemon again after an upgrade');
 
 /* pkg add -A marks the package automatic, and OPNsense's firmware tooling runs
    pkg autoremove; nothing depends on this plugin, so it would be deleted the next
