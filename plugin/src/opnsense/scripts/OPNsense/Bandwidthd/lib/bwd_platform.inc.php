@@ -176,6 +176,7 @@ function bwd_overrides_rows() {
  *
  * Item lookup is hasChild()/getChild() — ArrayField has no get(). */
 function bwd_overrides_save($rows, $reason = 'BandwidthD: per-device override') {
+	if (function_exists('bwd_host_overrides')) { bwd_host_overrides(true); }   // drop the memo of the old rows
 	$mdl = bwd_model();
 	if ($mdl === null) { return 'configuration model unavailable'; }
 	$list = $mdl->overrides->override;
@@ -412,6 +413,8 @@ function bwd_kea_reservations() {
 /* Build IP -> MAC. The live ARP table is authoritative; Kea reservations and
  * DHCP leases fill in devices that are currently quiet. */
 function bwd_platform_macmap() {
+	static $memo = null;   // one arp -an fork per request, not one per reader
+	if ($memo !== null) { return $memo; }
 	$map = array();
 	$out = array();
 	@exec('/usr/sbin/arp -an 2>/dev/null', $out);
@@ -429,7 +432,7 @@ function bwd_platform_macmap() {
 	foreach (bwd_kea_leases() + bwd_dnsmasq_leases() as $ip => $l) {
 		if (!isset($map[$ip]) && !empty($l['mac'])) { $map[$ip] = $l['mac']; }
 	}
-	return $map;
+	return $memo = $map;
 }
 
 /* Monitored subnets: the CIDRs bandwidthd is told to watch, mirroring what the

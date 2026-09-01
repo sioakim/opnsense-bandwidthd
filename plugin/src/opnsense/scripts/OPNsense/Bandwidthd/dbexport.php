@@ -171,7 +171,7 @@ function db_write_iface($conn, $P, $iface) {
 function read_cdf($after) {
 	$macmap = bwd_macmap();
 	$rows = array(); $iface = array(); $devs = array(); $maxTs = $after;
-	foreach (bwd_cdf_files(1) as $file) {
+	foreach (bwd_cdf_files(1, $after + 1, 0) as $file) {
 		$fh = @fopen($file, 'r');
 		if (!$fh) { continue; }
 		while (($line = fgets($fh)) !== false) {

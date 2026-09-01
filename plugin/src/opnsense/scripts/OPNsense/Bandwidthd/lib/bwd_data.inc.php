@@ -31,17 +31,60 @@ function bwd_period_tag($p) {
 	return ($p >= 1 && $p <= 4) ? $p : 1;
 }
 
-/* CDF files for a period, oldest->newest (slot 5 is oldest, 0 is current). */
-function bwd_cdf_files($period) {
+/* CDF files for a period, oldest->newest (slot 5 is oldest, 0 is current). With a
+ * window, slots whose [first,last] timestamp range misses it are left out: a 24h
+ * window lives in slots 0-1 and a 1h window in slot 0 alone, yet every reader
+ * used to scan all six (three times the bytes for 24h, six for 1h). */
+function bwd_cdf_files($period, $from = 0, $to = 0) {
 	$tag = bwd_period_tag($period);
 	$files = array();
 	foreach (array(5, 4, 3, 2, 1, 0) as $slot) {
 		$f = BWD_BASE . "/log.{$tag}.{$slot}.cdf";
-		if (is_file($f)) {
-			$files[] = $f;
+		if (!is_file($f)) { continue; }
+		if ($from || $to) {
+			list($lo, $hi) = bwd_cdf_file_range($f);
+			if ($hi && $from && $hi < $from) { continue; }   // whole file before the window
+			if ($lo && $to && $lo > $to) { continue; }       // whole file after it
 		}
+		$files[] = $f;
 	}
 	return $files;
+}
+
+/* Timestamp (field 1) of one CDF line without exploding it. */
+function bwd_cdf_line_ts($line) {
+	$c = strpos($line, ',');
+	if ($c === false) { return 0; }
+	$c2 = strpos($line, ',', $c + 1);
+	if ($c2 === false) { return 0; }
+	return (int) substr($line, $c + 1, $c2 - $c - 1);
+}
+
+/* [first_ts, last_ts] of a CDF file from its first line and its last 64 KB.
+ * Timestamps are non-decreasing within a file — bandwidthd appends one whole
+ * interval at a time (verified on a live 42k-line slot) — so that is the range.
+ * Memoised per size+mtime, so a request that consults six slots stats each once. */
+function bwd_cdf_file_range($file) {
+	static $cache = array();
+	$st = @stat($file);
+	if (!$st) { return array(0, 0); }
+	$key = $file . '|' . $st['size'] . '|' . $st['mtime'];
+	if (isset($cache[$key])) { return $cache[$key]; }
+	$first = 0; $last = 0;
+	$fh = @fopen($file, 'r');
+	if ($fh) {
+		while (($line = fgets($fh)) !== false) {
+			$ts = bwd_cdf_line_ts($line);
+			if ($ts > 0) { $first = $ts; break; }
+		}
+		if ($st['size'] > 65536) { fseek($fh, -65536, SEEK_END); fgets($fh); } else { rewind($fh); }
+		while (($line = fgets($fh)) !== false) {
+			$ts = bwd_cdf_line_ts($line);
+			if ($ts > $last) { $last = $ts; }
+		}
+		fclose($fh);
+	}
+	return $cache[$key] = array($first, $last);
 }
 
 /* IP -> friendly name. Sources are OPNsense-specific; see bwd_platform.inc.php. */
@@ -88,6 +131,17 @@ if (!defined('BWD_ALERT_STATE')) { define('BWD_ALERT_STATE', BWD_ROLLUP_DIR . '/
 /* Binary units: quotas and the report divide by 1024, so a "GB" here is a GiB. */
 if (!defined('GB')) { define('GB', 1073741824.0); }
 if (!defined('MB')) { define('MB', 1048576.0); }
+
+/* date('Y-m-d') memoised per timestamp: an interval's timestamp recurs for every
+ * host in it, so a tag-scoped unbounded window made ~300k date() calls. */
+function bwd_day_of($ts) {
+	static $m = array();
+	if (!isset($m[$ts])) {
+		if (count($m) > 100000) { $m = array(); }
+		$m[$ts] = date('Y-m-d', $ts);
+	}
+	return $m[$ts];
+}
 
 /* Empty per-host accumulator. */
 function bwd_blank_host($ip) {
@@ -302,14 +356,20 @@ function bwd_classify($mac, $ip = '', $name = null, $vendor = null) {
  * the lowercase match value (MAC or IP). Each row carries whatever fields the
  * settings UI stores (e.g. 'tag', plus alert overrides). On OPNsense these are
  * model-grid rows under OPNsense/Bandwidthd/overrides (see bwd_overrides_rows). */
-function bwd_host_overrides() {
+function bwd_host_overrides($reset = false) {
+	/* Memoised: bwd_hosts asks four times per host (name, vendor, display vendor,
+	 * classify) and each call walked the model's override rows through BaseField
+	 * objects. bwd_overrides_save() resets it. */
+	static $memo = null;
+	if ($reset) { $memo = null; return array(); }
+	if ($memo !== null) { return $memo; }
 	$out = array();
 	foreach (bwd_overrides_rows() as $r) {
 		if (!is_array($r)) { continue; }
 		$m = strtolower(trim($r['match'] ?? ''));
 		if ($m !== '') { $out[$m] = $r; }
 	}
-	return $out;
+	return $memo = $out;
 }
 
 /* True when an override row sets nothing beyond its match key, so it can be
@@ -498,7 +558,7 @@ function bwd_bucket_for($span, $target = 300) {
  * the hybrid path take only the live tail (ts > watermark). Returns [min_t,max_t]. */
 function bwd_cdf_accumulate(&$hosts, &$total, $period, $from, $to, $minExcl = 0) {
 	$min_t = 0; $max_t = 0;
-	foreach (bwd_cdf_files($period) as $file) {
+	foreach (bwd_cdf_files($period, max((int) $from, $minExcl ? $minExcl + 1 : 0), $to) as $file) {
 		$fh = @fopen($file, 'r');
 		if (!$fh) { continue; }
 		while (($line = fgets($fh)) !== false) {
@@ -643,7 +703,19 @@ function bwd_ips_for_mac($mac) {
  * (unix seconds; 0 = unbounded). bandwidthd's 0.0.0.0 row is the interface total
  * and is returned separately as total_host (not in the per-host list). Also
  * reports the min/max timestamp seen so the UI can bound its date pickers. */
+/* Per-process memo: one dashboard overview asks for the same host table two or
+ * three times (overview itself, the tag scope, the percentile's series), and each
+ * was a full CDF scan. Keyed by the exact window. */
 function bwd_hosts($period, $from = 0, $to = 0) {
+	static $memo = array();
+	$mk = (int) $period . '|' . (int) $from . '|' . (int) $to;
+	if (!isset($memo[$mk])) {
+		if (count($memo) > 16) { $memo = array(); }
+		$memo[$mk] = bwd_hosts_uncached($period, $from, $to);
+	}
+	return $memo[$mk];
+}
+function bwd_hosts_uncached($period, $from = 0, $to = 0) {
 	$hosts = array();
 	$total = bwd_blank_host('0.0.0.0');
 	$min_t = 0; $max_t = 0;
@@ -769,7 +841,7 @@ function bwd_series($id, $period, $from = 0, $to = 0, $tags = array(), $includeD
 		}
 		if ($r) { while ($row = pg_fetch_assoc($r)) { $agg[(int)$row['b']] = array((float)$row['i'], (float)$row['o']); } }
 		// CDF tail from the daily files (match any of the device's IPs)
-		foreach (bwd_cdf_files(1) as $file) {
+		foreach (bwd_cdf_files(1, max($from2, $W + 1), $to2) as $file) {
 			$fh = @fopen($file, 'r');
 			if (!$fh) { continue; }
 			while (($line = fgets($fh)) !== false) {
@@ -823,8 +895,11 @@ function bwd_series($id, $period, $from = 0, $to = 0, $tags = array(), $includeD
 			'from' => $from, 'to' => $to, 'bucket' => $bucket, 'points' => $points);
 	}
 
-	$points = array();
-	foreach (bwd_cdf_files($period) as $file) {
+	// A MAC's (or tag selection's) IPs are separate CDF rows: merge same-ts samples
+	// as they are read. Buffering one point per matching line first peaked at
+	// 126 MB for a tag scope over an unbounded window.
+	$by = array();
+	foreach (bwd_cdf_files($period, $from, $to) as $file) {
 		$fh = @fopen($file, 'r');
 		if (!$fh) { continue; }
 		while (($line = fgets($fh)) !== false) {
@@ -833,20 +908,12 @@ function bwd_series($id, $period, $from = 0, $to = 0, $tags = array(), $includeD
 			$ts = (int) $f[1];
 			if ($from && $ts < $from) { continue; }
 			if ($to && $ts > $to) { continue; }
-			$points[] = array('t' => $ts, 'in' => (float)$f[9], 'out' => (float)$f[2]);
+			if (!isset($by[$ts])) { $by[$ts] = array('t' => $ts, 'in' => 0.0, 'out' => 0.0); }
+			$by[$ts]['in'] += (float)$f[9]; $by[$ts]['out'] += (float)$f[2];
 		}
 		fclose($fh);
 	}
-	// A MAC's (or tag selection's) IPs are separate CDF rows; merge same-ts samples.
-	if (($isMac || $isTagScope) && $points) {
-		$by = array();
-		foreach ($points as $pt) {
-			$t = $pt['t'];
-			if (!isset($by[$t])) { $by[$t] = array('t' => $t, 'in' => 0.0, 'out' => 0.0); }
-			$by[$t]['in'] += $pt['in']; $by[$t]['out'] += $pt['out'];
-		}
-		$points = array_values($by);
-	}
+	$points = array_values($by);
 	usort($points, function($a, $b) { return $a['t'] <=> $b['t']; });
 	return array('ip' => $ip, 'name' => $name, 'period' => bwd_period_tag($period),
 		'from' => $from, 'to' => $to, 'points' => $points);
@@ -940,7 +1007,7 @@ function bwd_daily_breakdown($id, $period, $from = 0, $to = 0, $tags = array()) 
 			if ($r) { while ($x = pg_fetch_assoc($r)) { $add($x['d'], (float)$x['i'], (float)$x['o']); } }
 		}
 		// live CDF tail (ts > watermark)
-		foreach (bwd_cdf_files(1) as $file) {
+		foreach (bwd_cdf_files(1, max($from2, $W + 1), $to2) as $file) {
 			$fh = @fopen($file, 'r');
 			if (!$fh) { continue; }
 			while (($line = fgets($fh)) !== false) {
@@ -948,13 +1015,13 @@ function bwd_daily_breakdown($id, $period, $from = 0, $to = 0, $tags = array()) 
 				if (count($f) < 16 || !$wants($f[0])) { continue; }
 				$ts = (int) $f[1];
 				if ($ts <= $W || $ts < $from2 || $ts > $to2) { continue; }
-				$add(date('Y-m-d', $ts), (float)$f[9], (float)$f[2]);
+				$add(bwd_day_of($ts), (float)$f[9], (float)$f[2]);
 			}
 			fclose($fh);
 		}
 	} else {
 		// CDF-only: single pass over the period files (raw from/to, like bwd_series).
-		foreach (bwd_cdf_files($period) as $file) {
+		foreach (bwd_cdf_files($period, $from, $to) as $file) {
 			$fh = @fopen($file, 'r');
 			if (!$fh) { continue; }
 			while (($line = fgets($fh)) !== false) {
@@ -963,7 +1030,7 @@ function bwd_daily_breakdown($id, $period, $from = 0, $to = 0, $tags = array()) 
 				$ts = (int) $f[1];
 				if ($from && $ts < $from) { continue; }
 				if ($to && $ts > $to) { continue; }
-				$add(date('Y-m-d', $ts), (float)$f[9], (float)$f[2]);
+				$add(bwd_day_of($ts), (float)$f[9], (float)$f[2]);
 			}
 			fclose($fh);
 		}
@@ -1079,7 +1146,7 @@ function bwd_overview($period, $from = 0, $to = 0, $topn = 8, $tags = array()) {
 				$route($row['ip'], (int)$row['bin'], (float)$row['bytes']);
 			}
 		}
-		foreach (bwd_cdf_files(1) as $file) {
+		foreach (bwd_cdf_files(1, max($start, $W + 1), $end) as $file) {
 			$fh = @fopen($file, 'r');
 			if (!$fh) { continue; }
 			while (($line = fgets($fh)) !== false) {
@@ -1121,7 +1188,7 @@ function bwd_overview($period, $from = 0, $to = 0, $topn = 8, $tags = array()) {
 		}
 	} else {
 		// CDF-only: single pass over the period files.
-		foreach (bwd_cdf_files($period) as $file) {
+		foreach (bwd_cdf_files($period, $start, $end) as $file) {
 			$fh = @fopen($file, 'r');
 			if (!$fh) { continue; }
 			while (($line = fgets($fh)) !== false) {
