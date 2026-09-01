@@ -12,6 +12,10 @@ t_eq('{"a":1}', file_get_contents($f), 'content written');
 t_ok(bwd_atomic_write($f, '{"a":2}'), 'overwrite returns true');
 t_eq('{"a":2}', file_get_contents($f), 'content replaced');
 
+// a failed json_encode() (false) must not replace the file with an empty one
+t_ok(!bwd_atomic_write($f, false), 'refuses non-string contents');
+t_eq('{"a":2}', file_get_contents($f), 'previous content survives a refused write');
+
 // no leftover temp files in the directory (rename consumed them)
 $leftovers = array_filter((array) scandir($dir), function ($n) { return strpos($n, '.bwd') === 0; });
 t_eq(0, count($leftovers), 'no temp-file debris left behind');

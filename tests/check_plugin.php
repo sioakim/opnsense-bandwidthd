@@ -202,27 +202,40 @@ foreach ($aclXml->{'page-status-bandwidthd'}->patterns->pattern as $pat) {
     $statusPatterns[] = (string)$pat;
 }
 ok(!empty($statusPatterns), 'the status ACL declares patterns');
+/* Port of OPNsense\Core\ACL::urlMatch(): an anchored regex over the FULL request
+ * URI, query string included — not a glob over the path. A bare pattern with no
+ * trailing * never matches a call that carries parameters, which is how the
+ * Status role once got a dashboard whose every fetch was denied while this test
+ * passed with fnmatch(). */
+function bwd_test_url_match($url, $mask) {
+    $match = str_replace(['.', '*', '?'], ['\.', '.*', '\?'], $mask);
+    $match = preg_replace('@([/&?])\.\*$@', '($1.*)?', $match);
+    $url = preg_replace('@#.*$@', '', $url);
+    return preg_match("@^/{$match}$@", $url) === 1;
+}
+function bwd_test_acl_grants(array $patterns, $uri) {
+    foreach ($patterns as $pat) {
+        if (bwd_test_url_match($uri, $pat)) {
+            return true;
+        }
+    }
+    return false;
+}
 foreach ($writeActions as $w) {
-    $granted = false;
-    foreach ($statusPatterns as $pat) {
-        if (fnmatch($pat, $w)) {
-            $granted = true;
-            break;
-        }
+    foreach (["/$w", "/$w?mac=00:11:22:33:44:55", "/$w/"] as $uri) {
+        ok(!bwd_test_acl_grants($statusPatterns, $uri), "read-only status ACL does not grant the write endpoint: $uri");
     }
-    ok(!$granted, "read-only status ACL does not grant the write endpoint: $w");
 }
-/* And it must still grant everything the dashboard actually reads. */
+/* And it must still grant everything the dashboard actually reads — as the JS
+ * requests it, with the query string the framework matches against. */
 foreach (['hosts', 'series', 'percentile', 'daily', 'overview', 'tags', 'status', 'override', 'export'] as $a) {
-    $granted = false;
-    foreach ($statusPatterns as $pat) {
-        if (fnmatch($pat, "api/bandwidthd/data/$a")) {
-            $granted = true;
-            break;
-        }
+    foreach (["/api/bandwidthd/data/$a", "/api/bandwidthd/data/$a?period=1&from=0&to=0&mac=aa:bb"] as $uri) {
+        ok(bwd_test_acl_grants($statusPatterns, $uri), "status ACL grants the read endpoint the dashboard needs: $uri");
     }
-    ok($granted, "status ACL grants the read endpoint the dashboard needs: $a");
 }
+ok(bwd_test_acl_grants($statusPatterns, '/api/bandwidthd/service/status'), 'status ACL grants the service status read');
+ok(bwd_test_acl_grants($statusPatterns, '/ui/bandwidthd/dashboard'), 'status ACL grants the dashboard page');
+ok(!bwd_test_acl_grants($statusPatterns, '/ui/bandwidthd/general'), 'status ACL does not grant the settings page');
 
 /* 8c. A download action must RETURN its body. Calling $this->response->send()
  *     sends it, the framework sends again, throws "Response Already Sent", and

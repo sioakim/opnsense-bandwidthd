@@ -56,6 +56,10 @@ function bwd_hostmap() {
  * success. Used by every rollups/*.json writer (alerts rollup, exporter/probe
  * state, fingerprint + custom-tag sidecars). */
 function bwd_atomic_write($file, $contents) {
+	/* bwd_json() returns false on invalid UTF-8 (a Latin-1 <title> from a LAN
+	 * device is enough); file_put_contents($tmp, false) writes 0 bytes and returns
+	 * 0, so the rename would replace the state file with an empty one. */
+	if (!is_string($contents)) { return false; }
 	$dir = dirname($file);
 	if (!is_dir($dir)) { @mkdir($dir, 0755, true); }
 	$tmp = @tempnam($dir, '.bwd');
@@ -64,6 +68,13 @@ function bwd_atomic_write($file, $contents) {
 	@chmod($tmp, 0644);   // tempnam creates 0600; these are read by both root cron and the www GUI
 	if (!@rename($tmp, $file)) { @unlink($tmp); return false; }
 	return true;
+}
+
+/* bwd_json() for anything that may carry bytes from the LAN (device titles,
+ * banners, hostnames): invalid UTF-8 becomes U+FFFD instead of turning the whole
+ * document into false. Use this, not bwd_json(), for state files and exports. */
+function bwd_json($value, $flags = 0) {
+	return json_encode($value, $flags | JSON_INVALID_UTF8_SUBSTITUTE);
 }
 
 /* Empty per-host accumulator. */
@@ -383,7 +394,7 @@ function bwd_custom_tags_map($set = null) {
  * reflects what's actually on disk rather than silently "succeeding". */
 function bwd_custom_tags_save($map) {
 	$map = array_filter($map);
-	if (!bwd_atomic_write(BWD_BASE . '/rollups/custom_tags.json', json_encode((object) $map))) {
+	if (!bwd_atomic_write(BWD_BASE . '/rollups/custom_tags.json', bwd_json((object) $map))) {
 		return false;
 	}
 	bwd_custom_tags_map($map);

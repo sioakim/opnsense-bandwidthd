@@ -71,7 +71,7 @@ if (!empty($opts['cron'])) {
 	$autoOff = ($autoOffRaw === '' || $autoOffRaw === null) ? 24 : (int) $autoOffRaw;
 	$stateFile = BWD_BASE . '/rollups/probe_state.json';
 	$st = is_file($stateFile) ? (json_decode(@file_get_contents($stateFile), true) ?: array()) : array();
-	if (empty($st['enabled_at'])) { $st['enabled_at'] = time(); bwd_atomic_write($stateFile, json_encode($st)); }
+	if (empty($st['enabled_at'])) { $st['enabled_at'] = time(); bwd_atomic_write($stateFile, bwd_json($st)); }
 	if ($autoOff > 0 && (time() - (int) $st['enabled_at']) >= $autoOff * 3600) {
 		/* Turning the setting off is enough to remove the cron job: the schedule is
 		   derived from the settings by bandwidthd_cron(), so we just regenerate it. */
@@ -155,4 +155,4 @@ foreach ($targets as $ip) {
 		if ($o['nmap'])      { echo "    nmap:     " . implode(' ; ', array_slice($o['nmap'], 0, 6)) . "\n"; }
 	}
 }
-if (!empty($opts['json'])) { echo json_encode($results, JSON_PRETTY_PRINT) . "\n"; }
+if (!empty($opts['json'])) { echo bwd_json($results, JSON_PRETTY_PRINT) . "\n"; }

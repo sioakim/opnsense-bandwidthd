@@ -156,7 +156,7 @@ class DataController extends ApiControllerBase
         $this->response->setRawHeader(
             'Content-Disposition: attachment; filename="bandwidthd-' . $stamp . ($json ? '.json"' : '.csv"')
         );
-        return $json ? json_encode($data) : bwd_hosts_csv($data);
+        return $json ? bwd_json($data) : bwd_hosts_csv($data);
     }
 
     /* ------------------------------------------------------------- writes --- */

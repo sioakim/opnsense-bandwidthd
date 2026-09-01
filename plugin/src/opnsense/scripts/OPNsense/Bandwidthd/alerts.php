@@ -58,7 +58,7 @@ function dev_cfg($dev, $field, $global) {
 	return $global;
 }
 function jload($f) { return is_file($f) ? (json_decode(@file_get_contents($f), true) ?: array()) : array(); }
-function jsave($f, $d) { return bwd_atomic_write($f, json_encode($d)); }
+function jsave($f, $d) { return bwd_atomic_write($f, bwd_json($d)); }
 /* True when a JSON state file exists and is non-empty on disk but fails to decode
  * (truncated / corrupt) — distinct from a legitimately-absent file. */
 function jcorrupt($f) {

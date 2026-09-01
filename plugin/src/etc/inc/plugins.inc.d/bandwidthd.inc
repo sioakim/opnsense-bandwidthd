@@ -93,7 +93,7 @@ function bandwidthd_cron()
            the lock would be released the moment the job was queued rather than
            held for its duration — an overlap guard that guards nothing. */
         $jobs[]['autocron'] = [
-            '/usr/local/bin/flock -n -E 0 -o /tmp/bandwidthd_dbexport.lock ' .
+            '/usr/local/bin/flock -n -E 0 -o /var/run/bandwidthd_dbexport.lock ' .
             '/usr/local/sbin/configctl bandwidthd dbexport',
             '*/5'
         ];
@@ -103,7 +103,7 @@ function bandwidthd_cron()
     if (bandwidthd_setting('probe_enable') === '1') {
         /* Incremental: only devices whose fingerprint is missing or stale. */
         $jobs[]['autocron'] = [
-            '/usr/local/bin/flock -n -E 0 -o /tmp/bandwidthd_probe.lock ' .
+            '/usr/local/bin/flock -n -E 0 -o /var/run/bandwidthd_probe.lock ' .
             '/usr/local/sbin/configctl bandwidthd probe --cron',
             '*/30'
         ];

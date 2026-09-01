@@ -163,8 +163,11 @@ Full detail in `docs/PLATFORM.md`; the ones that bite hardest:
   off the config backup.
 - **Never `$this->response->send()` in an API action** — the framework sends
   again and its error handler appends JSON to the file being downloaded.
-- **An ACL pattern is a glob**: `api/<plugin>/data/*` grants the write actions
-  too. Read-only roles list their endpoints explicitly.
+- **An ACL pattern is an anchored regex over the full request URI, query string
+  included** — not a glob over the path. A read endpoint called with parameters
+  needs a trailing `*` or it never matches (a Status-only user saw 403 on every
+  dashboard fetch). And `api/<plugin>/data/*` grants the write actions too, so
+  read-only roles list their endpoints explicitly.
 - **The menu/ACL cache is separate and must be flushed.** A new `Menu.xml` or
   `ACL.xml` on disk changes nothing until `pluginctl -c cache_flush` runs — the
   plugin installs fine and is just missing from the navigation. Worse,
