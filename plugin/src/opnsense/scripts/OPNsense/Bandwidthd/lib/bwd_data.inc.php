@@ -1029,7 +1029,6 @@ function bwd_overview($period, $from = 0, $to = 0, $topn = 8, $tags = array()) {
 	$otherIdx = count($series);
 	$series[$otherIdx] = array('key' => 'other', 'name' => gettext('Other'),
 		'tag' => '', 'data' => array_fill(0, $nbins, 0.0));
-	$totalLine = array_fill(0, $nbins, 0.0);
 
 	// With a tag scope, only the tagged devices' IPs count — anything else is
 	// excluded outright (NOT folded into "Other", which is other tagged devices).
@@ -1048,9 +1047,9 @@ function bwd_overview($period, $from = 0, $to = 0, $topn = 8, $tags = array()) {
 	 * device's historical IPs to it as it goes, and a by-value capture would keep
 	 * the pre-loop copy and drop exactly those rows — the pre-seam traffic the
 	 * scope gate is there to let through. */
-	$route = function($ip, $b, $bytes) use (&$series, &$totalLine, $idx, $otherIdx, $nbins, &$allowed) {
+	$route = function($ip, $b, $bytes) use (&$series, $idx, $otherIdx, $nbins, &$allowed) {
 		if ($b < 0 || $b >= $nbins) { return; }
-		if ($ip === '0.0.0.0') { $totalLine[$b] += $bytes; return; }
+		if ($ip === '0.0.0.0') { return; }   // interface sentinel: the chart stacks devices, the total is summary data
 		if ($allowed !== null && !isset($allowed[$ip])) { return; }
 		$series[$idx[$ip] ?? $otherIdx]['data'][$b] += $bytes;
 	};
@@ -1079,11 +1078,6 @@ function bwd_overview($period, $from = 0, $to = 0, $topn = 8, $tags = array()) {
 				if ($scopeKeys !== null && $allowed !== null) { $allowed[$row['ip']] = true; }
 				$route($row['ip'], (int)$row['bin'], (float)$row['bytes']);
 			}
-		}
-		if (!$tags) {   // iface totals are meaningless under a tag scope
-			$ri = bwd_db_exec("SELECT ((ts - $start)/$bin) bin, sum(in_bytes+out_bytes) bytes
-				FROM {$p}iface WHERE ts >= $1 AND ts <= $2 GROUP BY bin", array($start, $dbEnd));
-			if ($ri) { while ($row = pg_fetch_assoc($ri)) { $route('0.0.0.0', (int)$row['bin'], (float)$row['bytes']); } }
 		}
 		foreach (bwd_cdf_files(1) as $file) {
 			$fh = @fopen($file, 'r');
@@ -1123,11 +1117,6 @@ function bwd_overview($period, $from = 0, $to = 0, $topn = 8, $tags = array()) {
 					if ($scopeKeys !== null && $allowed !== null) { $allowed[$row['ip']] = true; }   // tagged daily IP passes the scope gate
 					$route($row['ip'], $dayBin($row['d']), (float)$row['bytes']);
 				}
-			}
-			if (!$tags) {   // interface sentinel line
-				$ri = bwd_db_exec("SELECT day::text d, sum(in_bytes+out_bytes) bytes FROM {$p}daily
-					WHERE mac = '0.0.0.0' AND day >= $1 AND day <= $2 GROUP BY d", array($loDay, $hiDay));
-				if ($ri) { while ($row = pg_fetch_assoc($ri)) { $route('0.0.0.0', $dayBin($row['d']), (float)$row['bytes']); } }
 			}
 		}
 	} else {

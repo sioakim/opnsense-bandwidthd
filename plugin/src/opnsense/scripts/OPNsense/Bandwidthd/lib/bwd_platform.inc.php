@@ -347,7 +347,8 @@ function bwd_platform_hostmap() {
 		}
 	}
 
-	/* dnsmasq host overrides (repeated <hosts> elements, not a container). */
+	/* dnsmasq host overrides (repeated <hosts> elements, not a container — the
+	 * model mounts at /dnsmasq and <hosts> is the ArrayField itself). */
 	$dh = bwd_config_path('dnsmasq/hosts', array());
 	if (is_array($dh)) {
 		if (isset($dh['host']) || isset($dh['ip'])) { $dh = array($dh); }
@@ -373,6 +374,24 @@ function bwd_platform_hostmap() {
 }
 
 /* Kea static reservations from config.xml -> [ip => ['mac'=>..,'hostname'=>..]]. */
+/* dnsmasq static reservations: ip -> mac from the same <hosts> rows the hostmap
+ * reads, so a dnsmasq-only box gets identity for quiet devices the way a Kea box
+ * does from its reservations. */
+function bwd_dnsmasq_reservations() {
+	static $cache = null;
+	if ($cache !== null) { return $cache; }
+	$cache = array();
+	$dh = bwd_config_path('dnsmasq/hosts', array());
+	if (!is_array($dh)) { return $cache; }
+	if (isset($dh['host']) || isset($dh['ip']) || isset($dh['hwaddr'])) { $dh = array($dh); }
+	foreach ($dh as $h) {
+		if (!is_array($h) || empty($h['ip']) || empty($h['hwaddr']) || !empty($h['ignore'])) { continue; }
+		$mac = strtolower(trim((string) $h['hwaddr']));
+		if (preg_match('/^([0-9a-f]{2}:){5}[0-9a-f]{2}$/', $mac) && is_ipaddrv4((string) $h['ip'])) { $cache[(string) $h['ip']] = $mac; }
+	}
+	return $cache;
+}
+
 function bwd_kea_reservations() {
 	static $cache = null;
 	if ($cache !== null) { return $cache; }
@@ -403,6 +422,9 @@ function bwd_platform_macmap() {
 	}
 	foreach (bwd_kea_reservations() as $ip => $r) {
 		if (!isset($map[$ip]) && $r['mac'] !== '') { $map[$ip] = $r['mac']; }
+	}
+	foreach (bwd_dnsmasq_reservations() as $ip => $mac) {
+		if (!isset($map[$ip])) { $map[$ip] = $mac; }
 	}
 	foreach (bwd_kea_leases() + bwd_dnsmasq_leases() as $ip => $l) {
 		if (!isset($map[$ip]) && !empty($l['mac'])) { $map[$ip] = $l['mac']; }

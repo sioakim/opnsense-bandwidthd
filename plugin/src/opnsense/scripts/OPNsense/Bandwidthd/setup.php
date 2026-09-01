@@ -99,6 +99,8 @@ if (!bwd_atomic_write_raw($target, $out)) {
 foreach (array(BWD_BASE . '/htdocs', BWD_BASE . '/rollups') as $d) {
 	safe_mkdir($d);
 }
+/* The rollups are the household's device inventory; every reader runs as root. */
+@chmod(BWD_BASE . '/rollups', 0700);
 
 /* Reset the probe auto-off clock whenever probing is off.
  *
