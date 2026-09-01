@@ -31,13 +31,21 @@ unavailable, which is harmless but visible.
 
 ## Signing
 
-`pkg repo` signs the catalogue with an RSA key; clients verify it against a
-fingerprint file (`function: sha256` / `fingerprint: <sha256 of the public key>`)
+`pkg repo` signs the catalogue with an RSA key through an external
+`signing_command` (an `openssl dgst -sign` helper that `build-repo.sh` writes
+to a temp file); clients verify it against a fingerprint file (`function: sha256` / `fingerprint: <sha256 of the public key>`)
 under `/usr/local/etc/pkg/fingerprints/bandwidthd/trusted/`. `signature_type:
 "fingerprints"` in the repo config makes that verification mandatory.
 
 Committed, public: `repo/bandwidthd.pub` and `repo/fingerprints/trusted/bandwidthd`.
 `tests/check_plugin.php` asserts the fingerprint is the sha256 of that public key.
+
+⚠ Not `pkg repo <dir> rsa:<key>`. That is pkg's *internal* signer: it reports
+success and writes a `signature` member, but a `fingerprints` client ignores that
+member and reports `No signature found`, then refuses the repository. Fingerprint
+clients read `data.sig` + `data.pub`, which only the `signing_command:` path
+produces. The two are silent about each other; `build-repo.sh` checks for
+`data.sig` after signing for exactly this reason.
 
 **Private, never committed:** the signing key. It lives only on the build box
 (`REPO_SIGNING_KEY`, default `/root/bandwidthd-repo.key`, mode 600) and in the

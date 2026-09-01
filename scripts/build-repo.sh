@@ -40,8 +40,29 @@ rm -rf "${DIST_DIR}/repo"
 mkdir -p "${OUT}/All"
 cp "${DIST_DIR}"/*.pkg "${OUT}/All/"
 
+# Sign through an external command, not `pkg repo ... rsa:<key>`. The internal
+# rsa signer writes a `signature` member that only `signature_type: "pubkey"`
+# clients read; the `fingerprints` mode every OPNsense box uses (and
+# repo/bandwidthd.conf requests) verifies the `data.sig` + `data.pub` members
+# that only signing_command produces. pkg feeds the catalogue's SHA256 on stdin
+# and expects SIGNATURE / CERT / END back (pkg-repo(8)).
+SIGNER="$(mktemp)"
+trap 'rm -f "${SIGNER}"' EXIT
+cat > "${SIGNER}" <<SIGN
+#!/bin/sh
+read -r sum
+[ -n "\${sum}" ] || exit 1
+echo SIGNATURE
+printf '%s' "\${sum}" | openssl dgst -sign "${REPO_SIGNING_KEY}" -sha256 -binary
+echo
+echo CERT
+openssl rsa -in "${REPO_SIGNING_KEY}" -pubout 2>/dev/null
+echo END
+SIGN
+chmod 700 "${SIGNER}"
 log "signing repository catalogue for ${ABI}"
-pkg repo "${OUT}" "rsa:${REPO_SIGNING_KEY}"
+pkg repo "${OUT}" signing_command: "${SIGNER}"
+tar tf "${OUT}/data.pkg" | grep -qx 'data.sig' || die "catalogue is not signed for fingerprint clients (no data.sig member)"
 
 log "repository ready in ${OUT}:"
 ls -la "${OUT}" "${OUT}/All"
