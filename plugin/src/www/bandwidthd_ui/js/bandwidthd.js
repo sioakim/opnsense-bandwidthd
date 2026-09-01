@@ -118,7 +118,13 @@
 	}
 	// Toggle a "connection lost" indicator on the updated-stamp, keeping stale data
 	// visible rather than blanking the UI on a transient fetch failure.
-	function connError() { var u = el('#bwd-updated'); if (u) { u.textContent = '⚠ connection lost — retrying'; u.classList.add('bwd-stale'); } }
+	function connError(e) {
+		var u = el('#bwd-updated');
+		if (!u) { return; }
+		var http = e && e.message ? /^HTTP (\d+)/.exec(e.message) : null;
+		u.textContent = http ? '⚠ server error (HTTP ' + http[1] + ') — retrying' : '⚠ connection lost — retrying';
+		u.classList.add('bwd-stale');
+	}
 	function connOk() { var u = el('#bwd-updated'); if (u) { u.classList.remove('bwd-stale'); } }
 	function api(params) {
 		var rng = effRange();
@@ -131,7 +137,7 @@
 		return fetch(API + action + (q ? '?' + q : ''), { credentials: 'same-origin' }).then(function (r) {
 			if (!r.ok) { throw new Error('HTTP ' + r.status); }
 			return r.json();
-		}).then(function (j) { connOk(); return j; }, function (e) { connError(); throw e; });
+		}).then(function (j) { connOk(); return j; }, function (e) { connError(e); throw e; });
 	}
 	function label(h) {
 		if (h && h.is_total) { return h.name || 'Interface Total'; }
@@ -212,7 +218,7 @@
 		bar.hidden = false;
 		var sel = Object.keys(state.tags);                 // selected tag set
 		var html = '<button class="bwd-tag-chip' + (sel.length === 0 ? ' is-active' : '') +
-			'" data-tag="">All</button>';
+			'" data-tag="" aria-pressed="' + (sel.length === 0 ? 'true' : 'false') + '">All</button>';
 		tags.forEach(function (t) {
 			var tip = t + ': ' + fmtBytes(sums[t].total) + ' total (▼ ' + fmtBytes(sums[t].in) + ' / ▲ ' + fmtBytes(sums[t].out) + ')';
 			// No type tint here: a chip is a filter control, styled like the other
@@ -220,7 +226,7 @@
 			// the class only to have the chip rule cancel it was dead markup.
 			var cust = isCustomTag(t) ? ' bwd-tag-chip--custom' : '';
 			html += '<button class="bwd-tag-chip' + cust +
-				(state.tags[t] ? ' is-active' : '') + '" data-tag="' + escapeHtml(t) + '" title="' + escapeHtml(tip) + '">' +
+				(state.tags[t] ? ' is-active' : '') + '" data-tag="' + escapeHtml(t) + '" aria-pressed="' + (state.tags[t] ? 'true' : 'false') + '" title="' + escapeHtml(tip) + '">' +
 				escapeHtml(t) + ' <span class="bwd-tag-n">' + counts[t] + '</span></button>';
 		});
 		// Offer the cleanup editor once any custom tags exist.
@@ -238,7 +244,7 @@
 			});
 			html += '<div class="bwd-tag-summary"><b>' + escapeHtml(sel.slice().sort().join(', ')) + '</b> — ' +
 				agg.n + ' device' + (agg.n === 1 ? '' : 's') +
-				' · <span class="bwd-in">▼ ' + fmtBytes(agg.in) + '</span> · <span class="bwd-out">▲ ' + fmtBytes(agg.out) +
+				' · <span class="bwd-in"><i>▼</i> ' + fmtBytes(agg.in) + '</span> · <span class="bwd-out"><i>▲</i> ' + fmtBytes(agg.out) +
 				'</span> · total <b>' + fmtBytes(agg.total) + '</b></div>';
 		}
 		bar.innerHTML = html;
@@ -375,6 +381,7 @@
 		});
 		var max = rows.length ? Math.max.apply(null, rows.map(function (h) { return h.total; })) : 1;
 		var scrollTop = ul.scrollTop;   // preserve scroll across the rebuild (the 60s auto-refresh
+		var hadFocus = ul.contains(document.activeElement);   // ...and keyboard focus
 		ul.innerHTML = '';              // would otherwise yank a scrolled-down list back to the top)
 		// Pinned total row at the top (ignores search/sort): the interface total,
 		// or — with the tag filter active — the tag selection's total.
@@ -383,14 +390,15 @@
 			var tli = document.createElement('li');
 			tli.className = 'bwd-host bwd-host-total' + (state.selected === TOTAL_IP ? ' is-selected' : '');
 			tli.dataset.ip = TOTAL_IP;
+			rowA11y(tli, state.selected === TOTAL_IP);
 			tli.innerHTML =
 				'<div class="bwd-host-main">' +
 					'<span class="bwd-host-label">★ ' + escapeHtml(t.name || 'Interface Total') + '</span>' +
 					'<span class="bwd-host-sub">' + (selTags.length ? 'tag selection' : 'all hosts') + '</span>' +
 				'</div>' +
 				'<div class="bwd-host-nums">' +
-					'<span class="bwd-num bwd-in">▼ ' + fmtBytes(t.in) + '</span>' +
-					'<span class="bwd-num bwd-out">▲ ' + fmtBytes(t.out) + '</span>' +
+					'<span class="bwd-num bwd-in"><i>▼</i> ' + fmtBytes(t.in) + '</span>' +
+					'<span class="bwd-num bwd-out"><i>▲</i> ' + fmtBytes(t.out) + '</span>' +
 				'</div>';
 			tli.addEventListener('click', function () { selectHost(TOTAL_IP); });
 			ul.appendChild(tli);
@@ -399,6 +407,7 @@
 			var li = document.createElement('li');
 			li.className = 'bwd-host' + (h.ip === state.selected ? ' is-selected' : '');
 			li.dataset.ip = h.ip;
+			rowA11y(li, h.ip === state.selected);
 			var pct = max ? (h.total / max * 100) : 0;
 			var subParts = [];
 			var primarySub = (state.view === 'name' && h.name) ? h.ip : (h.name || '');
@@ -418,8 +427,8 @@
 					(sub ? '<span class="bwd-host-sub">' + sub + '</span>' : '') +
 				'</div>' +
 				'<div class="bwd-host-nums">' +
-					'<span class="bwd-num bwd-in">▼ ' + fmtBytes(h.in) + '</span>' +
-					'<span class="bwd-num bwd-out">▲ ' + fmtBytes(h.out) + '</span>' +
+					'<span class="bwd-num bwd-in"><i>▼</i> ' + fmtBytes(h.in) + '</span>' +
+					'<span class="bwd-num bwd-out"><i>▲</i> ' + fmtBytes(h.out) + '</span>' +
 				'</div>';
 			li.addEventListener('click', function () { selectHost(h.ip); });
 			ul.appendChild(li);
@@ -428,9 +437,21 @@
 			// Append, don't replace: the interface-total row is pinned above and is
 			// documented to ignore search and sort, so wiping innerHTML would take it
 			// (and the current selection highlight) with it.
-			ul.insertAdjacentHTML('beforeend', '<li class="bwd-empty-row">No hosts match.</li>');
+			ul.insertAdjacentHTML('beforeend', '<li class="bwd-empty-row" role="presentation">' +
+				((q || selTags.length) ? 'No hosts match.' : 'No hosts in this window.') + '</li>');
 		}
 		ul.scrollTop = scrollTop;   // restore the pre-rebuild scroll position
+		if (hadFocus) {   // the rows were recreated: put focus back where the keyboard user was
+			var again = ul.querySelector('.bwd-host.is-selected') || ul.querySelector('.bwd-host');
+			if (again) { again.focus({ preventScroll: true }); }
+		}
+	}
+	// A host row is an option in the list's listbox: reachable by Tab, opened with
+	// Enter/Space (handled once on the <ul>), selection exposed to assistive tech.
+	function rowA11y(li, selected) {
+		li.setAttribute('role', 'option');
+		li.tabIndex = 0;
+		li.setAttribute('aria-selected', selected ? 'true' : 'false');
 	}
 	function escapeHtml(s) {
 		return String(s).replace(/[&<>"']/g, function (c) {
@@ -618,7 +639,7 @@
 			if (p && p.samples >= 2 && p.total_bps > 0) {
 				box.innerHTML = '<span class="bwd-pctile-k">95th percentile</span>' +
 					'<span class="bwd-pctile-v">' + fmtBps(p.total_bps) + '</span>' +
-					'<span class="bwd-pctile-sub">▼ ' + fmtBps(p.in_bps) + ' · ▲ ' + fmtBps(p.out_bps) +
+					'<span class="bwd-pctile-sub"><i class="bwd-in">▼</i> ' + fmtBps(p.in_bps) + ' · <i class="bwd-out">▲</i> ' + fmtBps(p.out_bps) +
 					' · ' + p.samples + ' samples</span>';
 				box.hidden = false;
 			} else {
@@ -711,7 +732,7 @@
 		box.innerHTML =
 			'<div class="bwd-daily-head"><span class="bwd-daily-title">Daily totals</span>' +
 				'<span class="bwd-daily-sub">' + days.length + ' day' + (days.length === 1 ? '' : 's') +
-				' · <span class="bwd-in">▼ ' + fmtBytes(d.total_in) + '</span> · <span class="bwd-out">▲ ' + fmtBytes(d.total_out) +
+				' · <span class="bwd-in"><i>▼</i> ' + fmtBytes(d.total_in) + '</span> · <span class="bwd-out"><i>▲</i> ' + fmtBytes(d.total_out) +
 				'</span> · total <b>' + fmtBytes(d.total) + '</b></span></div>' +
 			'<table class="bwd-daily-tbl"><thead><tr>' +
 				'<th>Date</th><th class="bwd-daily-num">In</th><th class="bwd-daily-num">Out</th>' +
@@ -729,21 +750,23 @@
 	function renderChart(points) {
 		var canvas = el('#bwd-chart');
 		var empty = el('#bwd-chart-empty');
+		// destroy() first: Chart.js restores the canvas's original inline style on
+		// destroy, so hiding the canvas before it silently un-hid it again and the
+		// empty state rendered under a blank chart.
+		if (state.chart) { state.chart.destroy(); state.chart = null; }
 		if (!points.length) {
-			empty.style.display = 'block';
-			canvas.style.display = 'none';
-			if (state.chart) { state.chart.destroy(); state.chart = null; }
+			empty.hidden = false;
+			canvas.hidden = true;
 			return;
 		}
-		empty.style.display = 'none';
-		canvas.style.display = 'block';
+		empty.hidden = true;
+		canvas.hidden = false;
 		var span = points.length > 1 ? (points[points.length - 1].t - points[0].t) : 0;
 		var labels = points.map(function (p) { return fmtAxis(p.t, span); });
 		var inData = points.map(function (p) { return p.in; });
 		var outData = points.map(function (p) { return p.out; });
 		// Read In/Out from the CSS tokens so the chart re-themes in dark mode.
 		var IN = cssVar('--bwd-in', SERIES_IN), OUT = cssVar('--bwd-out', SERIES_OUT);
-		if (state.chart) { state.chart.destroy(); }
 		state.chart = new Chart(canvas.getContext('2d'), {
 			type: 'line',
 			data: {
@@ -770,9 +793,10 @@
 					}
 				},
 				scales: {
-					x: { grid: { display: false }, ticks: { maxTicksLimit: 8, color: cssVar('--bwd-muted', '#7f7f7f') } },
+					x: { grid: { display: false }, ticks: { maxTicksLimit: 8, color: mutedFg() } },
 					y: { beginAtZero: true, grid: { color: cssVar('--bwd-grid', 'rgba(128,128,128,.18)') },
-						 ticks: { color: cssVar('--bwd-muted', '#7f7f7f'), callback: function (v) { return fmtBytes(v); } } }
+						 title: { display: true, text: 'bytes per sample', color: mutedFg(), font: { size: 10 } },
+						 ticks: { color: mutedFg(), callback: function (v) { return fmtBytes(v); } } }
 				}
 			}
 		});
@@ -794,6 +818,13 @@
 		// changes under the page.
 		var host = el('#bwd-app') || document.body;
 		return getComputedStyle(host).color || '#373736';
+	}
+	// Muted text for canvas ticks: 70% of the theme's ink, the same mix the CSS uses
+	// for --bwd-muted in the DOM. The concrete #7f7f7f fallback is 4.0:1 on the
+	// light theme, just under AA; the derived colour clears it on both themes.
+	function mutedFg() {
+		var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(themeFg());
+		return m ? 'rgba(' + m[1] + ',' + m[2] + ',' + m[3] + ',.7)' : '#7f7f7f';
 	}
 
 	/* ---------- overview: summary cards + stacked-area chart ---------- */
@@ -835,22 +866,27 @@
 		var hasData = o.series && o.series.some(function (s) {
 			return s.data.some(function (v) { return v > 0; });
 		});
+		// destroy() before touching the canvas: Chart.js restores the canvas's inline
+		// style on destroy, which used to un-hide it and leave a blank panel over the
+		// (still hidden) empty message.
+		if (state.ovChart) { state.ovChart.destroy(); state.ovChart = null; }
+		var wrap = canvas.parentNode;
 		if (!o.labels || !o.labels.length || !hasData) {
-			// toggle via inline style: the author rule `.bwd-empty{display:none}` beats
-			// the [hidden] attribute, so `hidden=false` alone would never show it.
-			if (empty) { empty.style.display = ''; }
-			canvas.style.display = 'none';
-			if (state.ovChart) { state.ovChart.destroy(); state.ovChart = null; }
+			if (empty) { empty.hidden = false; }
+			wrap.hidden = true;
 			return;
 		}
-		if (empty) { empty.style.display = 'none'; }
-		canvas.style.display = 'block';
+		if (empty) { empty.hidden = true; }
+		wrap.hidden = false;
 		var ospan = o.labels.length > 1 ? (o.labels[o.labels.length - 1] - o.labels[0]) : 0;
 		var labels = o.labels.map(function (t) { return fmtAxis(t, ospan); });
 		// bytes-per-bin -> Mbps (stacked sum = interface throughput)
+		// Classic10's grey (index 7) is reserved for the "Other" bucket, so the eighth
+		// named talker and "Other" never share a colour.
+		var named = SERIES_COLORS.filter(function (c, i) { return i !== 7; });
 		var datasets = o.series.map(function (s, i) {
-			var color = SERIES_COLORS[i % SERIES_COLORS.length];
-			if (s.key === 'other') { color = cssVar('--bwd-muted', '#7f7f7f'); }
+			var color = named[i % named.length];
+			if (s.key === 'other') { color = SERIES_COLORS[7]; }
 			return {
 				label: s.name + (s.tag ? ' (' + s.tag + ')' : ''),
 				data: s.data.map(function (b) { return b * 8 / bin / 1e6; }),
@@ -858,7 +894,6 @@
 				borderWidth: 1, pointRadius: 0, pointHoverRadius: 3, fill: true, tension: 0.25
 			};
 		});
-		if (state.ovChart) { state.ovChart.destroy(); }
 		state.ovChart = new Chart(canvas.getContext('2d'), {
 			type: 'line',
 			data: { labels: labels, datasets: datasets },
@@ -872,9 +907,9 @@
 						label: function (c) { return c.dataset.label + ': ' + c.parsed.y.toFixed(2) + ' Mbps'; } } }
 				},
 				scales: {
-					x: { stacked: true, grid: { display: false }, ticks: { maxTicksLimit: 10, color: cssVar('--bwd-muted', '#7f7f7f') } },
+					x: { stacked: true, grid: { display: false }, ticks: { maxTicksLimit: 10, color: mutedFg() } },
 					y: { stacked: true, beginAtZero: true, grid: { color: cssVar('--bwd-grid', 'rgba(128,128,128,.18)') },
-						 ticks: { color: cssVar('--bwd-muted', '#7f7f7f'), callback: function (v) { return v + ' Mbps'; } } }
+						 ticks: { color: mutedFg(), callback: function (v) { return v + ' Mbps'; } } }
 				}
 			}
 		});
@@ -933,7 +968,7 @@
 		var hi = el('#bwd-hero-in'), ho = el('#bwd-hero-out'), hw = el('#bwd-hero-window');
 		if (hi) { hi.textContent = fmtBytes(tin); }
 		if (ho) { ho.textContent = fmtBytes(tout); }
-		if (hw) { hw.textContent = sel.length ? sel.join(', ') : (state.windowLabel || 'this window'); }
+		if (hw) { hw.textContent = (state.windowLabel || 'this window') + (sel.length ? ' · ' + sel.join(', ') : ''); }
 	}
 	function loadHosts() {
 		var _seq = ++state.hostsSeq;
@@ -1001,8 +1036,8 @@
 		if (jsonBtn) { jsonBtn.addEventListener('click', function () { window.location = exportUrl('json'); }); }
 		document.querySelectorAll('.bwd-viewtoggle button').forEach(function (btn) {
 			btn.addEventListener('click', function () {
-				document.querySelectorAll('.bwd-viewtoggle button').forEach(function (b) { b.classList.remove('is-active'); });
-				btn.classList.add('is-active');
+				document.querySelectorAll('.bwd-viewtoggle button').forEach(function (b) { b.classList.remove('is-active'); b.setAttribute('aria-pressed', 'false'); });
+				btn.classList.add('is-active'); btn.setAttribute('aria-pressed', 'true');
 				state.view = btn.dataset.view;
 				renderList();
 				if (state.selected) { var h = hostByIp(state.selected); if (h) { el('#bwd-detail-title').textContent = label(h); } }
@@ -1010,8 +1045,8 @@
 		});
 		document.querySelectorAll('.bwd-sort').forEach(function (btn) {
 			btn.addEventListener('click', function () {
-				document.querySelectorAll('.bwd-sort').forEach(function (b) { b.classList.remove('is-active'); });
-				btn.classList.add('is-active');
+				document.querySelectorAll('.bwd-sort').forEach(function (b) { b.classList.remove('is-active'); b.setAttribute('aria-pressed', 'false'); });
+				btn.classList.add('is-active'); btn.setAttribute('aria-pressed', 'true');
 				state.sort = btn.dataset.sort;
 				renderList();
 			});
@@ -1019,6 +1054,15 @@
 		el('#bwd-search').addEventListener('input', function (e) {
 			state.search = e.target.value;
 			renderList();
+		});
+		el('#bwd-hostlist').addEventListener('keydown', function (e) {
+			if (e.key !== 'Enter' && e.key !== ' ') { return; }
+			var row = e.target && e.target.closest ? e.target.closest('.bwd-host') : null;
+			if (row && row.dataset.ip) { e.preventDefault(); selectHost(row.dataset.ip); }
+		});
+		// Toggle groups expose their state (the window buttons already did).
+		document.querySelectorAll('.bwd-viewtoggle button, .bwd-sort').forEach(function (b) {
+			b.setAttribute('aria-pressed', b.classList.contains('is-active') ? 'true' : 'false');
 		});
 		// ---- unified Window selector (presets + Custom) ----
 		function reloadRange() {
@@ -1055,11 +1099,7 @@
 		// Custom: reveal the From/To inputs (does not fetch until a date is picked).
 		el('.bwd-window-custom').addEventListener('click', function () {
 			var btn = this, open = btn.getAttribute('aria-expanded') !== 'true';
-			showCustom(open);
-			if (open) {
-				clearWindows();
-				btn.classList.add('is-active'); btn.setAttribute('aria-pressed', 'true');
-			}
+			showCustom(open);   // pressed state follows applyCustom(), not the reveal
 		});
 		// A custom From/To overrides the preset: rangeSecs cleared, the CDF tier is
 		// auto-derived from the chosen span so the right-resolution data is read.
@@ -1067,6 +1107,13 @@
 			state.rangeSecs = 0;
 			state.from = toEpoch(el('#bwd-from').value);
 			state.to   = toEpoch(el('#bwd-to').value);
+			if (state.from && state.to && state.from > state.to) {   // inverted: swap rather than fetch nothing
+				var sw = state.from; state.from = state.to; state.to = sw;
+				el('#bwd-from').value = toLocalInput(state.from); el('#bwd-to').value = toLocalInput(state.to);
+			}
+			clearWindows();
+			var cb = el('.bwd-window-custom');
+			if (cb) { cb.classList.add('is-active'); cb.setAttribute('aria-pressed', 'true'); }
 			var span = (state.to || Math.floor(Date.now() / 1000)) - (state.from || 0);
 			state.period = spanToPeriod(span > 0 ? span : 31536000);
 			state.windowLabel = 'custom range';

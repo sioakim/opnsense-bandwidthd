@@ -107,6 +107,17 @@ a fork, and it is what lets the test suite run off-box.
 - The page must stay horizontal-overflow-free at phone width; the toolbar's window
   strip scrolls rather than widening the sheet. Bump the `?v=` on the css/js tags
   in `dashboard.volt` when you change either.
+- **Toggle visibility with `el.hidden`, never `style.display`** — `.bwd-app [hidden]`
+  is `display:none !important`, so an inline display never wins against it. And
+  **call `chart.destroy()` before hiding its canvas**: Chart.js restores the
+  canvas's original inline style on destroy, which un-hid it and left a blank
+  panel over an empty-state message that never appeared.
+- **Direction colour goes on the ▼/▲ glyph or the dot, never on the number.** The
+  Classic10 orange is 2.5:1 as text on the light theme and the blue 3.9:1 on
+  dark; both fail AA at any size the dashboard uses. Numbers inherit the ink.
+- **Host rows are `role="option"` with `tabindex="0"` inside a `listbox`**, opened
+  by Enter/Space (one delegated handler on the `<ul>`); a rebuild of the list puts
+  focus back on the selected row. Keep that when touching `renderList`.
 - Keep the data layer free of output so it stays CLI-testable.
 - **Verify a reported finding on the box before acting on it.** In one review
   round: a "missing" Monit field existed (the fix would have broken working TLS

@@ -5,7 +5,7 @@
 # — in practice the OPNsense box itself.
 
 # ---- Version / identity knobs (override via environment) --------------------
-: "${PLUGIN_VERSION:=1.0.0}"           # os-bandwidthd version
+: "${PLUGIN_VERSION:=1.0.1}"           # os-bandwidthd version
 : "${BWD_VERSION:=2.0.1_12}"           # bandwidthd (daemon) version
 : "${LIBGD_VERSION:=2.3.3_13,1}"       # graphics/gd dependency pin
 : "${MAINTAINER:=spyros@ioakeim.com}"
