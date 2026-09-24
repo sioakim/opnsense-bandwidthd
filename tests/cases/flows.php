@@ -13,6 +13,19 @@ $flow = function ($cli, $srv, $cb, $sb, $info = '', $app = 'TLS', $key = '1', $f
 };
 
 /* ---- destination label ---- */
+foreach (array('-.example', '-bad.example', 'bad-.example', 'ok.bad-', str_repeat('a', 64) . '.example',
+	'ok.' . str_repeat('a', 64), 'empty..example') as $invalid) {
+	t_eq('198.51.100.1', bwd_flows_dest_label($invalid, '', '198.51.100.1'), 'reject invalid destination label: ' . $invalid);
+	t_eq('valid.example', bwd_flows_dest_label($invalid, 'valid.example', '198.51.100.1'), 'invalid info falls back to server name: ' . $invalid);
+	t_eq('198.51.100.1', bwd_flows_dest_label('', $invalid, '198.51.100.1'), 'reject invalid server label: ' . $invalid);
+}
+foreach (array('_dmarc.example.com', 'a._service', 'a.b', 'a-b.example', str_repeat('a', 63) . '.example') as $valid) {
+	t_eq($valid, bwd_flows_dest_label($valid, '', '198.51.100.1'), 'accept valid destination label: ' . $valid);
+}
+$maxName = str_repeat(str_repeat('a', 63) . '.', 3) . str_repeat('b', 61);
+t_eq($maxName, bwd_flows_dest_label($maxName, '', '198.51.100.1'), 'accept 253-character destination');
+t_eq('198.51.100.1', bwd_flows_dest_label($maxName . 'b', '', '198.51.100.1'), 'reject 254-character destination');
+t_eq('2001:db8::1', bwd_flows_dest_label('-.example', 'bad-.example', '2001:db8::1'), 'invalid labels preserve IPv6 fallback');
 t_eq('video.example.com', bwd_flows_dest_label('Video.Example.COM.', '', '198.51.100.1'), 'SNI lower-cased, trailing dot dropped');
 t_eq('198.51.100.1', bwd_flows_dest_label('Desktop Sharing', '198.51.100.1', '198.51.100.1'),
 	'free-text info (a Teams STUN label) is not a destination');

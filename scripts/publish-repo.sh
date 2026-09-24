@@ -21,14 +21,8 @@ PAGES_BRANCH=gh-pages
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-# The GitHub remote: `github` if there is one, else the remote on github.com.
-if [ -z "${GH_REMOTE}" ]; then
-	GH_REMOTE=github
-	if ! git -C "${REPO_ROOT}" remote get-url github >/dev/null 2>&1; then
-		GH_REMOTE="$(git -C "${REPO_ROOT}" remote -v | awk '$2 ~ /github\.com[:\/]/ { print $1; exit }')"
-		[ -n "${GH_REMOTE}" ] || GH_REMOTE=github
-	fi
-fi
+. "${SCRIPT_DIR}/lib/github-remote.sh"
+GH_REMOTE="$(bwd_github_remote "${REPO_ROOT}")"
 WORK="$(mktemp -d)"
 SITE="${WORK}/site"
 cleanup() {

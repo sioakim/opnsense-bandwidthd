@@ -47,7 +47,7 @@ function bwd_flows_dest_label($info, $remoteName, $remoteIp) {
 	foreach (array($info, $remoteName) as $v) {
 		$v = strtolower(trim((string) $v));
 		if ($v !== '' && strlen($v) <= 253 && strpos($v, '.') !== false &&
-			preg_match('/^[a-z0-9_-]+(\.[a-z0-9_-]+)+\.?$/', $v) &&
+			preg_match('/^[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?(?:\.[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?)+\.?$/', $v) &&
 			!filter_var(rtrim($v, '.'), FILTER_VALIDATE_IP)) {
 			return rtrim($v, '.');
 		}
