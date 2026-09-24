@@ -781,7 +781,7 @@
 		var notes = [];
 		var st = destStatusNote();
 		if (st) { notes.push(escapeHtml(st)); }
-		if (d && d.since && d.from < d.since) { notes.push('collecting since ' + escapeHtml(fmtFull(d.since))); }
+		if (d && d.since && d.from < d.since) { notes.push('history available from ' + escapeHtml(fmtFull(d.since))); }
 		var head = '<div class="bwd-daily-head"><span class="bwd-daily-title" title="Sampled every minute from ntopng\'s live flows; ' +
 				'very short connections can be missed, so totals run below the traffic figures above.">Destinations</span>' +
 			'<span class="bwd-daily-sub">' + (rows.length ?
@@ -815,7 +815,7 @@
 		var more = '';
 		if (rows.length > DEST_COLLAPSE) {
 			more = '<button class="bwd-daily-more" type="button">' +
-				(state.destExpanded ? 'Show less' : 'Show all ' + rows.length + (d.more ? '+' : '') + ' destinations') + '</button>';
+				(state.destExpanded ? 'Show less' : (d.more ? 'Show top ' : 'Show all ') + rows.length + ' destinations') + '</button>';
 		}
 		box.innerHTML = head +
 			(chips ? '<div class="bwd-dest-chips">' + chips + '</div>' : '') +

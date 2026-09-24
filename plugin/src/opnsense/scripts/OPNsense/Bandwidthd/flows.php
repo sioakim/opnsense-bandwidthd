@@ -26,11 +26,13 @@ if (!bwd_cfg_on('flows_enable')) {
 
 /* One collector at a time: cron starts it detached every minute, and a slow
  * ntopng must not let runs overlap and both advance the same flow counters. */
-@mkdir(BWD_FLOWS_DIR, 0700, true);
-$lockFh = @fopen(BWD_FLOWS_DIR . '/collect.lock', 'c');
-if ($lockFh === false || !@flock($lockFh, LOCK_EX | LOCK_NB)) {
-	echo "another collection is already running — skipped.\n";
-	exit(0);
+if (!$dry) {
+	@mkdir(BWD_FLOWS_DIR, 0700, true);
+	$lockFh = @fopen(BWD_FLOWS_DIR . '/collect.lock', 'c');
+	if ($lockFh === false || !@flock($lockFh, LOCK_EX | LOCK_NB)) {
+		echo "another collection is already running — skipped.\n";
+		exit(0);
+	}
 }
 
 $now = time();
@@ -44,6 +46,9 @@ $status = function ($ok, $error, $count) use ($dry, $now) {
 	bwd_atomic_write(BWD_FLOWS_DIR . '/status.json',
 		bwd_json(array('ok' => $ok, 'at' => $now, 'error' => $error, 'flows' => $count)));
 };
+
+/* Housekeeping must still run during an ntopng outage. */
+if (!$dry) { bwd_flows_compact($now, $topn, $retention); }
 
 if ($token === '') {
 	$status(false, 'no ntopng API token configured', 0);
@@ -62,7 +67,9 @@ if ($err !== '') {
 
 $stateFile = BWD_FLOWS_DIR . '/state.json';
 $state = is_file($stateFile) ? json_decode((string) @file_get_contents($stateFile), true) : null;
-if (!is_array($state)) { $state = array('ts' => 0, 'flows' => array()); }
+/* Old keys omit ports/protocol: baseline once on upgrade rather than treating
+ * their replacements as new flows and replaying lifetime counters. */
+if (!is_array($state) || ($state['v'] ?? 0) !== 2) { $state = array('ts' => 0, 'flows' => array()); }
 
 $cidrs = bwd_fp_allowed_cidrs();
 $isLocal = function ($ip) use ($cidrs) {
@@ -90,18 +97,10 @@ printf("%d flows, %d tracked, %d devices, %d destinations, %.1f MB%s\n", count($
 
 if ($dry) { exit(0); }
 
-$hourFile = bwd_flows_hour_file($now);
-$bucket = bwd_flows_load($hourFile);
-bwd_flows_merge($bucket, $add, $topn);
-if (!bwd_atomic_write($hourFile, bwd_json($bucket))) {
-	$status(false, 'could not write ' . $hourFile, count($flows));
-	fwrite(STDERR, "could not write $hourFile\n");
+$err = bwd_flows_commit($now, $next, $add, $topn);
+if ($err !== '') {
+	$status(false, $err, count($flows));
+	fwrite(STDERR, "$err\n");
 	exit(1);
 }
-/* Only after the bucket is safely written, or a failed write would lose this
-   poll's deltas for good. */
-bwd_atomic_write($stateFile, bwd_json(array('ts' => $now, 'flows' => $next)));
 $status(true, '', count($flows));
-
-$c = bwd_flows_compact($now, $topn, $retention);
-if ($c) { echo "compacted $c day(s).\n"; }

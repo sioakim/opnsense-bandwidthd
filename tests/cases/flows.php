@@ -53,7 +53,7 @@ $f4 = $flow('192.0.2.10', '192.0.2.1', 50, 50, 'router.lan', 'DNS', '4', 2100);
 $f5 = $flow('198.51.100.9', '203.0.113.9', 50, 50, '', 'TLS', '5', 2100);
 list($st5, $add) = bwd_flows_ingest($st2, 2060, array($f4, $f5), $isLocal, $idOf, 2120);
 t_eq(0, count($add['hosts']), 'local<->local and remote<->remote flows skipped');
-t_eq(0, count($st5), 'skipped flows are not tracked');
+t_eq(array_keys($st2), array_keys($st5), 'skipped flows add no state; missing known flows retain grace');
 
 // A counter that went backwards is a reused key: count the new flow in full.
 $f1r = $flow('192.0.2.10', '198.51.100.1', 5, 50, 'video.example.com', 'TLS.Video');
@@ -61,8 +61,26 @@ list(, $add) = bwd_flows_ingest($st2, 2060, array($f1r), $isLocal, $idOf, 2120);
 t_eq(array(50.0, 5.0, 'TLS.Video'), $add['hosts']['aa:bb:cc:00:00:10']['d']['video.example.com'], 'counter reset counted from zero');
 
 // After a gap longer than BWD_FLOWS_STALE the poll is a baseline again.
-list(, $add) = bwd_flows_ingest($st2, 2060, array($f1b, $f2), $isLocal, $idOf, 2060 + BWD_FLOWS_STALE + 1);
+$grown = $f1b;
+$grown['bytes']['srv_bytes'] = 1000000;
+list(, $add) = bwd_flows_ingest($st2, 2060, array($grown, $f2), $isLocal, $idOf, 2060 + BWD_FLOWS_STALE + 1);
 t_eq(0, count($add['hosts']), 'stale previous poll: nothing counted');
+
+// Identical rows subtract the previous observation only once.
+list(, $once) = bwd_flows_ingest($st, 2000, array($f1b, $f1b), $isLocal, $idOf, 2060);
+t_eq(4000.0, $once['hosts']['aa:bb:cc:00:00:10']['d']['video.example.com'][0], 'duplicate rows cannot subtract prev twice');
+foreach (array('client', 'server', 'protocol') as $field) {
+	$distinct = $f1b;
+	if ($field === 'protocol') { $distinct['l4_proto']['name'] = 'UDP'; }
+	else { $distinct[$field]['port'] = 443; }
+	list($keys,) = bwd_flows_ingest(array(), 0, array($f1b, $distinct), $isLocal, $idOf, 2060);
+	t_eq(2, count($keys), $field . ' distinguishes simultaneous flow keys');
+}
+list($missing,) = bwd_flows_ingest($st, 2000, array(), $isLocal, $idOf, 2060);
+list(, $back) = bwd_flows_ingest($missing, 2060, array($f1b), $isLocal, $idOf, 2120);
+t_eq(4000.0, $back['hosts']['aa:bb:cc:00:00:10']['d']['video.example.com'][0], 'one missing poll does not replay lifetime counters');
+list($expired,) = bwd_flows_ingest($missing, 2060, array(), $isLocal, $idOf, 2601);
+t_eq(array(), $expired, 'grace expires from last sighting, not the last poll');
 
 /* ---- merge + cap ---- */
 $b = array('v' => 1, 'hosts' => array());
@@ -117,6 +135,105 @@ t_eq(array(), bwd_destinations('aa:bb:cc:00:00:77', 1, 0, 0, array(), 100, $dir,
 // Retention: daily files older than the retention are removed.
 bwd_flows_compact(strtotime('2026-03-20 12:30:00'), 100, 9, $dir);
 t_ok(!is_file("$dir/d/20260301.json"), 'daily files past retention removed');
+
+// A far-future request is bounded by actual retained history and now.
+$started = microtime(true);
+$selected = bwd_flows_files(1, 253402300799, $now, $dir);
+t_eq(2, count($selected), 'extreme window selects only surviving files');
+$r = bwd_destinations('0.0.0.0', 1, 1, 253402300799, array(), 1, $dir, $now);
+t_eq(300.0, $r['total_in'] + 0.0, 'extreme API window aggregates only retained files');
+t_ok(microtime(true) - $started < 1, 'extreme window completes without walking arbitrary timestamps');
+t_eq(array(), bwd_flows_files($now, $now - 1, $now, $dir), 'reversed window selects nothing');
+
+// The repeated local hour is one physical file and must contribute only once.
+$tz = date_default_timezone_get();
+date_default_timezone_set('Europe/Athens');
+$dstDir = "$dir/dst";
+$fall = strtotime('2026-10-25T03:00:00+03:00');
+bwd_atomic_write(bwd_flows_hour_file($fall, $dstDir), bwd_json($mk('dst.example', 300)));
+$paths = bwd_flows_files($fall, $fall + 7199, $fall + 7200, $dstDir);
+t_eq(1, count($paths), 'DST repeated hour is read once');
+t_eq(1, count(bwd_flows_files($fall, $fall + 1800, $fall + 7200, $dstDir)), 'first occurrence of oldest DST hour remains selectable');
+$r = bwd_destinations('0.0.0.0', 1, $fall, $fall + 7199, array(), 100, $dstDir, $fall + 7200);
+t_eq(300.0, $r['total_in'] + 0.0, 'DST shared file contributes its bytes once');
+unlink(bwd_flows_hour_file($fall, $dstDir));
+rmdir("$dstDir/h"); rmdir($dstDir);
+date_default_timezone_set($tz);
+
+// An invalid input must not finalise a partial day or destroy its good hours.
+$bad = bwd_flows_hour_file($old + 3600, $dir);
+$good = bwd_flows_hour_file($old, $dir);
+bwd_atomic_write($good, bwd_json($mk('survivor.example', 321)));
+bwd_atomic_write($bad, '{broken');
+t_eq(null, bwd_flows_load($bad), 'invalid bucket is distinct from missing');
+t_eq(array('v' => 1, 'hosts' => array()), bwd_flows_load("$dir/absent.json"), 'missing bucket is empty');
+t_eq(0, bwd_flows_compact($now, 100, 31, $dir), 'invalid hourly input prevents daily finalisation');
+t_ok(!file_exists(bwd_flows_day_file($old, $dir)) && is_file($good), 'invalid day keeps good hours and has no daily file');
+$r = bwd_destinations('0.0.0.0', 1, $old, $old + 7200, array(), 100, $dir, $now);
+t_eq(321.0, $r['total_in'] + 0.0, 'old day without daily file falls back to surviving hours');
+unlink($bad);
+mkdir($bad); // A directory is an existing but unreadable bucket on every test uid.
+t_eq(null, bwd_flows_load($bad), 'unreadable bucket is not empty');
+t_eq(0, bwd_flows_compact($now, 100, 31, $dir), 'unreadable hourly input prevents daily finalisation');
+rmdir($bad);
+unlink($good);
+
+// Failed state persistence cannot commit a delta which the next poll replays.
+$commitDir = "$dir/commit";
+mkdir($commitDir);
+mkdir("$commitDir/state.json");
+$err = bwd_flows_commit($now, $st2, $mk('commit.example', 50), 100, $commitDir);
+t_ok(strpos($err, 'could not write') === 0, 'state-write failure is returned');
+t_ok(!file_exists(bwd_flows_hour_file($now, $commitDir)), 'state-write failure must not commit bucket');
+rmdir("$commitDir/state.json");
+// Isolate the next failure even when a mutation incorrectly wrote the bucket.
+if (is_file(bwd_flows_hour_file($now, $commitDir))) { unlink(bwd_flows_hour_file($now, $commitDir)); }
+if (is_dir("$commitDir/h")) { rmdir("$commitDir/h"); }
+// Block the hour directory: state must already be durable when bucket writing fails.
+bwd_atomic_write("$commitDir/h", 'blocked');
+$err = bwd_flows_commit($now, $st2, $mk('commit.example', 50), 100, $commitDir);
+$durable = json_decode((string) @file_get_contents("$commitDir/state.json"), true);
+t_eq($now, $durable['ts'] ?? null, 'state precedes bucket write, closing the replay crash window');
+t_ok($err !== '', 'bucket-write failure is returned');
+$recover = $f1b;
+$recover['bytes']['srv_bytes'] = 9020;
+list(, $recovered) = bwd_flows_ingest($durable['flows'] ?? array(), $durable['ts'] ?? 0, array($recover), $isLocal, $idOf, $now + 60);
+t_eq(20.0, $recovered['hosts']['aa:bb:cc:00:00:10']['d']['video.example.com'][0] ?? null, 'recovery after interrupted commit counts only new growth');
+unlink("$commitDir/h");
+$hour = bwd_flows_hour_file($now, $commitDir);
+bwd_atomic_write($hour, '{broken');
+$before = file_get_contents("$commitDir/state.json");
+$err = bwd_flows_commit($now + 1, array(), $mk('commit.example', 50), 100, $commitDir);
+t_ok(strpos($err, 'could not read') === 0, 'collector refuses invalid existing bucket');
+t_eq('{broken', file_get_contents($hour), 'collector does not overwrite invalid bucket');
+t_eq($before, file_get_contents("$commitDir/state.json"), 'read failure does not advance state');
+unlink($hour);
+mkdir($hour);
+t_ok(strpos(bwd_flows_commit($now, array(), $mk('x', 1), 100, $commitDir), 'could not read') === 0, 'collector refuses unreadable existing bucket');
+rmdir($hour);
+
+// B's steady 90 bytes must accumulate past the 99 initial 100-byte leaders.
+$rank = array('v' => 1, 'hosts' => array('m' => array('d' => array(), 'a' => array())));
+for ($i = 0; $i < 99; $i++) { $rank['hosts']['m']['d']['leader' . $i] = array(100, 0, 'TLS'); }
+$rank['hosts']['m']['d']['C'] = array(1, 0, 'TLS');
+bwd_flows_commit($now, array(), $rank, 100, $commitDir);
+$steady = array('hosts' => array('m' => array('d' => array('B' => array(90, 0, 'TLS')), 'a' => array())));
+for ($i = 0; $i < 10; $i++) { bwd_flows_commit($now, array(), $steady, 100, $commitDir); }
+$r = bwd_destinations('0.0.0.0', 1, $now - 1, $now, array(), 100, $commitDir, $now);
+t_eq('B', $r['dests'][0]['name'], 'hourly headroom preserves steady destination ranking');
+t_eq(900.0, $r['dests'][0]['in'] + 0.0, 'steady destination retains all ten polls');
+// Daily ranking must also wait for every hour: B starts below the leaders.
+bwd_atomic_write($hour, bwd_json($rank));
+bwd_flows_commit($now, array(), $steady, 100, $commitDir);
+$steady['hosts']['m']['d']['B'][0] = 810;
+bwd_flows_commit($now + 3600, array(), $steady, 100, $commitDir);
+bwd_flows_compact($now + 86400, 100, 31, $commitDir);
+$daily = bwd_flows_load(bwd_flows_day_file($now, $commitDir));
+t_eq(100, count($daily['hosts']['m']['d']), 'daily compaction applies strict cap after accumulation');
+t_eq(900.0, $daily['hosts']['m']['d']['B'][0] + 0.0, 'daily ranking accumulates all hours before folding destinations');
+array_map('unlink', array_merge(glob("$commitDir/h/*") ?: array(), glob("$commitDir/d/*") ?: array()));
+unlink("$commitDir/state.json");
+rmdir("$commitDir/h"); rmdir("$commitDir/d"); rmdir($commitDir);
 
 array_map('unlink', array_merge(glob("$dir/h/*") ?: array(), glob("$dir/d/*") ?: array()));
 @rmdir("$dir/h"); @rmdir("$dir/d"); @rmdir($dir);

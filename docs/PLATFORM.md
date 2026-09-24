@@ -108,7 +108,10 @@ Jobs are derived from the settings by `bandwidthd_cron()`, but the stock
 `system_cron_configure()`. Until 1.1.0 only install and uninstall did, so a
 feature switched on in the GUI silently had no job (and one switched off kept
 running) until the next package install. `ServiceController::reconfigureAction()`
-now runs the `bandwidthd cron` configd action after the stock work.
+now runs the `bandwidthd cron` configd action only after a successful stock
+reconfigure POST. The `type:script` action returns `OK` on success; any other
+result sets the returned `status` to `failed` with a cron diagnostic, preserving
+the settings page's object response.
 
 ### PHP cannot open URLs
 
@@ -224,3 +227,26 @@ listing.
   quiet.
 - **Server-side data stays out of the web root.** The OUI table and fingerprint
   signature DB live beside the code that reads them, so they are not fetchable.
+
+### Destination sampling persistence and time boundaries
+
+The collector commits flow state before its hour bucket. Death or a bucket-write
+failure between those writes may lose one poll's delta; it cannot replay a delta
+already committed. Failed state writes stop collection and appear in status.
+Existing unreadable or invalid buckets are never treated as empty when writing;
+a failed hourly read prevents daily finalisation. Queries fall back to surviving
+hours when a daily file is absent. Housekeeping runs before fetching, so an
+ntopng outage does not suspend retention. Dry runs skip all filesystem writes.
+
+Flow state includes both ports and the transport protocol and keeps missing
+flows for at most the stale interval since their last sighting. Identical keys
+within a poll use the first observation. The new state format baselines once
+when upgrading from keys without ports/protocol, avoiding lifetime-counter replay.
+
+The repeated local hour at DST fall-back shares one hourly file. Queries read
+that file once, but cannot isolate either occurrence. Hourly buckets retain four
+times the configured destination limit so steady destinations can accumulate;
+ranking remains approximate beyond that bound. Daily compaction caps after
+merging all hours, and queries apply their response limit after aggregation.
+“History available from” is the oldest retained bucket boundary, not the time
+collection first started.

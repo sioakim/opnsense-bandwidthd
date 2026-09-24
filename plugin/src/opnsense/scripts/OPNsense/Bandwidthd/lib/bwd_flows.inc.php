@@ -57,7 +57,7 @@ function bwd_flows_dest_label($info, $remoteName, $remoteIp) {
 /**
  * Turn one poll of ntopng's active flows into per-device byte deltas.
  *
- * $prev     flow key => [sent, recv] from the previous poll (local side's view)
+ * $prev     flow key => [sent, recv, lastSeen] from the previous poll (local side's view)
  * $prevTs   time of the previous poll, 0 if none
  * $flows    rows of rest/v2/get/flow/active_list.lua, each with an 'ifid'
  * $isLocal  fn(ip): bool — inside the monitored subnets
@@ -70,6 +70,13 @@ function bwd_flows_dest_label($info, $remoteName, $remoteIp) {
 function bwd_flows_ingest($prev, $prevTs, $flows, $isLocal, $idOf, $now) {
 	$baseline = !$prevTs || ($now - $prevTs) > BWD_FLOWS_STALE;
 	$next = array();
+	/* A transient omission must not turn lifetime counters into new traffic. */
+	if (!$baseline) {
+		foreach ($prev as $key => $v) {
+			if ($now - ($v[2] ?? $prevTs) <= BWD_FLOWS_STALE) { $next[$key] = $v; }
+		}
+	}
+	$seen = array();
 	$add = array('v' => 1, 'hosts' => array());
 	foreach ((array) $flows as $f) {
 		$cli = (string) ($f['client']['ip'] ?? '');
@@ -82,16 +89,19 @@ function bwd_flows_ingest($prev, $prevTs, $flows, $isLocal, $idOf, $now) {
 		$sb = (float) ($f['bytes']['srv_bytes'] ?? 0);
 		$sent = $cliLocal ? $cb : $sb;
 		$recv = $cliLocal ? $sb : $cb;
-		$key = ($f['ifid'] ?? 0) . '|' . ($f['key'] ?? '') . '|' . (int) ($f['first_seen'] ?? 0) . '|' . $cli . '|' . $srv;
-		$next[$key] = array($sent, $recv);
+		$key = ($f['ifid'] ?? 0) . '|' . ($f['key'] ?? '') . '|' . (int) ($f['first_seen'] ?? 0) . '|' . $cli . '|' . $srv .
+			'|' . ($f['client']['port'] ?? 0) . '|' . ($f['server']['port'] ?? 0) . '|' . ($f['l4_proto']['id'] ?? $f['l4_proto']['name'] ?? '');
+		/* Identical rows describe one observation: consistently keep the first. */
+		if (isset($seen[$key])) { continue; }
+		$seen[$key] = true;
+		$next[$key] = array($sent, $recv, $now);
+		if ($baseline) { continue; }
 
 		if (isset($prev[$key])) {
 			$dOut = $sent - $prev[$key][0];
 			$dIn = $recv - $prev[$key][1];
 			/* Counters only grow; a drop means ntopng reused the key for a new flow. */
 			if ($dOut < 0 || $dIn < 0) { $dOut = $sent; $dIn = $recv; }
-		} elseif ($baseline) {
-			continue;
 		} else {
 			/* Started since the last poll, so all of it belongs after that poll. */
 			$dOut = $sent; $dIn = $recv;
@@ -117,7 +127,7 @@ function bwd_flows_ingest($prev, $prevTs, $flows, $isLocal, $idOf, $now) {
 
 /* Add bucket $add into bucket $dst, then keep each device's top $topn
  * destinations and fold the rest into BWD_FLOWS_OTHER. Applications are few
- * and are never capped. */
+ * and are never capped. A zero limit defers capping until all inputs merge. */
 function bwd_flows_merge(&$dst, $add, $topn) {
 	if (!isset($dst['hosts']) || !is_array($dst['hosts'])) { $dst = array('v' => 1, 'hosts' => array()); }
 	foreach ((array) ($add['hosts'] ?? array()) as $id => $ah) {
@@ -132,7 +142,7 @@ function bwd_flows_merge(&$dst, $add, $topn) {
 			if (!isset($h['a'][$app])) { $h['a'][$app] = array(0.0, 0.0); }
 			$h['a'][$app][0] += $v[0]; $h['a'][$app][1] += $v[1];
 		}
-		bwd_flows_cap($h['d'], $topn);
+		if ($topn > 0) { bwd_flows_cap($h['d'], $topn); }
 		unset($h);
 	}
 }
@@ -156,9 +166,39 @@ function bwd_flows_cap(&$d, $topn) {
 function bwd_flows_hour_file($ts, $dir = BWD_FLOWS_DIR) { return $dir . '/h/' . date('YmdH', $ts) . '.json'; }
 function bwd_flows_day_file($ts, $dir = BWD_FLOWS_DIR) { return $dir . '/d/' . date('Ymd', $ts) . '.json'; }
 
+/* Missing is empty; an existing unreadable or malformed bucket is an error.
+ * Validate the nested counters too: valid JSON alone is not a valid bucket. */
 function bwd_flows_load($file) {
-	$j = is_file($file) ? json_decode((string) @file_get_contents($file), true) : null;
-	return (is_array($j) && isset($j['hosts']) && is_array($j['hosts'])) ? $j : array('v' => 1, 'hosts' => array());
+	if (!file_exists($file) && !is_link($file)) { return array('v' => 1, 'hosts' => array()); }
+	$j = json_decode((string) @file_get_contents($file), true);
+	if (!is_array($j) || ($j['v'] ?? null) !== 1 || !isset($j['hosts']) || !is_array($j['hosts'])) { return null; }
+	foreach ($j['hosts'] as $h) {
+		if (!is_array($h)) { return null; }
+		foreach (array('d', 'a') as $kind) {
+			if (!isset($h[$kind]) || !is_array($h[$kind])) { return null; }
+			foreach ($h[$kind] as $v) {
+				if (!is_array($v) || !isset($v[0], $v[1]) || !is_numeric($v[0]) || !is_numeric($v[1]) || $v[0] < 0 || $v[1] < 0) { return null; }
+			}
+		}
+	}
+	return $j;
+}
+
+/* State first prevents replay after death between writes. A crash or failed
+ * bucket write can undercount this one poll, acceptable for sampled data.
+ * A failed state write must never be followed by a bucket write. */
+function bwd_flows_commit($now, $next, $add, $topn, $dir = BWD_FLOWS_DIR) {
+	$hourFile = bwd_flows_hour_file($now, $dir);
+	$bucket = bwd_flows_load($hourFile);
+	if ($bucket === null) { return 'could not read ' . $hourFile; }
+	/* Hourly headroom lets steady mid-sized destinations accumulate. Ranking
+	 * remains approximate beyond this bound; daily/query limits stay strict. */
+	bwd_flows_merge($bucket, $add, 4 * $topn);
+	if (!bwd_atomic_write($dir . '/state.json', bwd_json(array('v' => 2, 'ts' => $now, 'flows' => $next)))) {
+		return 'could not write ' . $dir . '/state.json';
+	}
+	if (!bwd_atomic_write($hourFile, bwd_json($bucket))) { return 'could not write ' . $hourFile; }
+	return '';
 }
 
 /* Start of the hour-resolution horizon: older data is read from daily files. */
@@ -184,17 +224,25 @@ function bwd_flows_compact($now, $topn, $retentionDays, $dir = BWD_FLOWS_DIR) {
 		if ($day >= $today || is_file("$dir/d/$day.json")) { continue; }
 		$b = array('v' => 1, 'hosts' => array());
 		sort($files);
-		foreach ($files as $f) { bwd_flows_merge($b, bwd_flows_load($f), $topn); }
+		foreach ($files as $f) {
+			$hour = bwd_flows_load($f);
+			if ($hour === null) { continue 2; }
+			bwd_flows_merge($b, $hour, 0);
+		}
+		foreach ($b['hosts'] as &$host) { bwd_flows_cap($host['d'], $topn); }
+		unset($host);
 		if (bwd_atomic_write("$dir/d/$day.json", bwd_json($b))) { $compacted++; }
 	}
+	$dCut = date('Ymd', $now - max(1, (int) $retentionDays) * 86400);
 	$hCut = date('YmdH', bwd_flows_hourly_horizon($now));
 	foreach ((glob($dir . '/h/*.json') ?: array()) as $f) {
 		$h = basename($f, '.json');
-		/* Only once its day has been compacted, so no hour is lost if the
-		   compaction write above failed. */
-		if ($h < $hCut && is_file("$dir/d/" . substr($h, 0, 8) . '.json')) { @unlink($f); }
+		/* Within retention, preserve hours until a readable daily file exists.
+		 * Retention itself still expires hours whose compaction keeps failing. */
+		$daily = "$dir/d/" . substr($h, 0, 8) . '.json';
+		if (substr($h, 0, 8) < $dCut ||
+			($h < $hCut && is_file($daily) && bwd_flows_load($daily) !== null)) { @unlink($f); }
 	}
-	$dCut = date('Ymd', $now - max(1, (int) $retentionDays) * 86400);
 	foreach ((glob($dir . '/d/*.json') ?: array()) as $f) {
 		if (basename($f, '.json') < $dCut) { @unlink($f); }
 	}
@@ -205,13 +253,18 @@ function bwd_flows_compact($now, $topn, $retentionDays, $dir = BWD_FLOWS_DIR) {
  * before it. A daily file is all-or-nothing, so a window that starts part-way
  * through an old day includes that whole day. */
 function bwd_flows_files($from, $to, $now, $dir = BWD_FLOWS_DIR) {
+	$oldest = bwd_flows_since($dir);
+	/* Bound by the oldest stored date, including either occurrence of an
+	 * ambiguous fall-back hour in the oldest filename. */
+	$from = max($from, strtotime(date('Y-m-d', $oldest) . ' 00:00:00'));
+	$to = min($to, $now);
+	if (!$oldest || $from > $to) { return array(); }
 	$horizon = bwd_flows_hourly_horizon($now);
 	$files = array();
 	for ($t = strtotime(date('Y-m-d', $from) . ' 00:00:00'); $t <= $to; $t = strtotime('+1 day', $t)) {
 		if ($t < $horizon) {
 			$f = bwd_flows_day_file($t, $dir);
-			if (is_file($f)) { $files[] = $f; }
-			continue;
+			if (is_file($f)) { $files[] = $f; continue; }
 		}
 		$end = strtotime('+1 day', $t);
 		for ($hh = $t; $hh < $end; $hh += 3600) {
@@ -220,10 +273,12 @@ function bwd_flows_files($from, $to, $now, $dir = BWD_FLOWS_DIR) {
 			if (is_file($f)) { $files[] = $f; }
 		}
 	}
-	return $files;
+	/* Fall-back's repeated local hour shares one file, including both hours'
+	 * traffic even for a partial-hour query. Never read that file twice. */
+	return array_values(array_unique($files));
 }
 
-/* The earliest time any bucket covers — "collecting since" on the dashboard. */
+/* The earliest time any bucket covers — "history available from" on the dashboard. */
 function bwd_flows_since($dir = BWD_FLOWS_DIR) {
 	$first = 0;
 	foreach (array('d', 'h') as $sub) {
@@ -267,7 +322,7 @@ function bwd_destinations($id, $period, $from = 0, $to = 0, $tags = array(), $li
 
 	$d = array(); $a = array();
 	foreach (bwd_flows_files($from2, $to2, $now, $dir) as $f) {
-		foreach (bwd_flows_load($f)['hosts'] as $hid => $h) {
+		foreach ((bwd_flows_load($f)['hosts'] ?? array()) as $hid => $h) {
 			if (!$all && !isset($keys[strtolower($hid)]) && !isset($ips[$h['ip'] ?? ''])) { continue; }
 			foreach ((array) ($h['d'] ?? array()) as $dest => $v) {
 				if (!isset($d[$dest])) { $d[$dest] = array(0.0, 0.0, (string) ($v[2] ?? '')); }
