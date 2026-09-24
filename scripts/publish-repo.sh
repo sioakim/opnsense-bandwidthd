@@ -15,7 +15,7 @@ set -eu
 
 HOST="${1:?usage: sh scripts/publish-repo.sh user@host}"
 REMOTE_DIR="${REMOTE_DIR:-/root/opnsense-bandwidthd}"
-SCP="${SCP:-scp}"               # e.g. SCP="sshpass -e scp" for a password-auth box
+SCP="${SCP:-scp}"               # plain scp over key auth; see "Releasing" in CLAUDE.md
 GH_REMOTE="${GH_REMOTE:-}"
 PAGES_BRANCH=gh-pages
 

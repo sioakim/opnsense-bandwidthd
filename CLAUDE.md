@@ -47,7 +47,7 @@ and anything at the top of a stage root would install at `/`.
 ## Releasing
 
 Releases go out as a signed `pkg(8)` repository on GitHub Pages (`gh-pages`
-branch); `docs/REPOSITORY.md` has the whole picture. Two things to know when
+branch); `docs/REPOSITORY.md` has the whole picture. Three things to know when
 touching it:
 
 - `repo/` is the client-facing material: the repo config, the installer, the
@@ -59,6 +59,11 @@ touching it:
   here. It pushes `gh-pages` to the `github` remote if one exists, else to the
   remote whose URL is on github.com (in the canonical clone, `origin`). That
   remote carries `main` too.
+- **SSH to the box is key login.** `deploy-dev.sh` and `publish-repo.sh` use plain
+  `ssh`/`scp`, and `build-repo.sh` is run on the box over the same login; never wire
+  password auth into them. OPNsense drops a key
+  added with `ssh-copy-id` when the box reboots, so after a reboot use the root
+  password once to re-run `ssh-copy-id user@host`, then carry on with key login.
 
 ## The platform seam
 
