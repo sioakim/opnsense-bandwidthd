@@ -37,12 +37,16 @@
 		// first response and the percentile strip would never render.
 		pctileSeq: 0,
 		dailySeq: 0,
+		destSeq: 0,
 		hosts: [],
 		totalHost: null,   // the 0.0.0.0 interface-total aggregate
 		ifaceIn: 0,        // interface-wide window totals (the toolbar pills'
 		ifaceOut: 0,       // fallback when no tag filter is active)
 		selected: null,
 		dailyExpanded: false,  // per-date table show-all toggle
+		destExpanded: false,   // destinations table show-all toggle
+		flowsEnabled: false,   // ntopng destinations collection on (from status)
+		flowsStatus: null,     // outcome of the last collection
 		tagEditorOpen: false,  // custom-tag editor panel visibility
 		chart: null,
 		ovChart: null
@@ -59,6 +63,8 @@
 	var TYPE_TAGS = ['pc', 'phone', 'tablet', 'tv', 'iot', 'camera', 'printer',
 		'network', 'voip', 'gaming', 'nas', 'appliance'];
 	var DAILY_COLLAPSE = 14;   // daily-table rows shown before the "show all" toggle
+	var DEST_COLLAPSE = 15;    // destination rows shown before the "show all" toggle
+	var DEST_APPS = 8;         // application chips shown above the destinations table
 	// In/Out fallbacks: the first two Classic10 entries, matching core's charts.
 	// The live values come from the CSS tokens (--bwd-in / --bwd-out).
 	var SERIES_IN = '#1f77b4', SERIES_OUT = '#ff7f0e';
@@ -537,11 +543,13 @@
 			renderProto(h);
 		}
 		state.dailyExpanded = false;   // collapse the per-date table on each new selection
+		state.destExpanded = false;
 		// Fetch by MAC when known so a device's lease-renewal IPs are unioned.
 		var seriesId = (h && h.mac) ? h.mac : ip;
 		loadSeries(seriesId);
 		loadPercentile(ip, seriesId);
 		loadDaily(ip, seriesId);
+		loadDestinations(ip, seriesId);
 		renderAlertCfg(h);
 	}
 
@@ -682,6 +690,7 @@
 		loadSeries(seriesId);
 		loadPercentile(state.selected, seriesId);
 		loadDaily(state.selected, seriesId);
+		loadDestinations(state.selected, seriesId);
 	}
 	function loadDaily(ip, seriesId) {
 		var _seq = ++state.dailySeq;
@@ -740,6 +749,82 @@
 				rowsHtml + '</tbody></table>' + more;
 		var mb = box.querySelector('.bwd-daily-more');
 		if (mb) { mb.addEventListener('click', function () { state.dailyExpanded = !state.dailyExpanded; renderDaily(d); }); }
+	}
+	/* ---------- destinations (sampled from ntopng) ---------- */
+	function loadDestinations(ip, seriesId) {
+		var box = el('#bwd-dest');
+		if (!box) { return; }
+		if (!state.flowsEnabled) { box.hidden = true; box.innerHTML = ''; return; }
+		var _seq = ++state.destSeq;
+		var q = { action: 'destinations', ip: seriesId || ip, period: state.period, limit: 200 };
+		if (q.ip === TOTAL_IP && tagParam()) { q.tags = tagParam(); }   // tag-scoped total
+		api(q).then(function (d) {
+			if (_seq !== state.destSeq) { return; }   // superseded by a newer window/selection
+			if (state.selected !== ip) { return; }
+			renderDestinations(d);
+		}).catch(function () {});
+	}
+	// Why the numbers may be missing or behind, or '' when collection is healthy.
+	function destStatusNote() {
+		var s = state.flowsStatus;
+		if (!s || !s.at) { return 'waiting for the first collection from ntopng'; }
+		if (!s.ok) { return '⚠ last collection failed: ' + (s.error || 'unknown error'); }
+		var age = Math.floor(Date.now() / 1000) - s.at;
+		if (age > 300) { return '⚠ last collected ' + Math.round(age / 60) + ' min ago'; }
+		return '';
+	}
+	function renderDestinations(d) {
+		var box = el('#bwd-dest');
+		if (!box) { return; }
+		var rows = (d && d.dests) || [];
+		var apps = (d && d.apps) || [];
+		var notes = [];
+		var st = destStatusNote();
+		if (st) { notes.push(escapeHtml(st)); }
+		if (d && d.since && d.from < d.since) { notes.push('collecting since ' + escapeHtml(fmtFull(d.since))); }
+		var head = '<div class="bwd-daily-head"><span class="bwd-daily-title" title="Sampled every minute from ntopng\'s live flows; ' +
+				'very short connections can be missed, so totals run below the traffic figures above.">Destinations</span>' +
+			'<span class="bwd-daily-sub">' + (rows.length ?
+				'<span class="bwd-in"><i>▼</i> ' + fmtBytes(d.total_in) + '</span> · <span class="bwd-out"><i>▲</i> ' +
+				fmtBytes(d.total_out) + '</span> · sampled' : 'sampled') + '</span></div>' +
+			(notes.length ? '<div class="bwd-dest-note">' + notes.join(' · ') + '</div>' : '');
+		box.hidden = false;
+		if (!rows.length) {
+			box.innerHTML = head + '<div class="bwd-dest-note">No destinations recorded for this window yet.</div>';
+			return;
+		}
+		var chips = apps.slice(0, DEST_APPS).map(function (a) {
+			return '<span class="bwd-dest-chip">' + escapeHtml(a.name) + ' <b>' + fmtBytes(a.total) + '</b></span>';
+		}).join('');
+		var max = rows.reduce(function (m, r) { return r.other ? m : Math.max(m, r.total); }, 0) || 1;
+		var shown = state.destExpanded ? rows : rows.slice(0, DEST_COLLAPSE);
+		var body = shown.map(function (r) {
+			var w = Math.min(100, r.total / max * 100);
+			var inW = r.total ? (r.in / r.total * 100) : 0;
+			return '<tr' + (r.other ? ' class="bwd-dest-other"' : '') + '>' +
+				'<td class="bwd-dest-name">' + escapeHtml(r.name) + '</td>' +
+				'<td class="bwd-dest-app">' + escapeHtml(r.app || '') + '</td>' +
+				'<td class="bwd-daily-num bwd-in">' + fmtBytes(r.in) + '</td>' +
+				'<td class="bwd-daily-num bwd-out">' + fmtBytes(r.out) + '</td>' +
+				'<td class="bwd-daily-num bwd-daily-tot">' + fmtBytes(r.total) + '</td>' +
+				'<td class="bwd-daily-barcell"><span class="bwd-daily-bar" style="width:' + w.toFixed(1) + '%">' +
+					'<i class="bwd-in" style="width:' + inW.toFixed(1) + '%"></i>' +
+					'<i class="bwd-out" style="width:' + (100 - inW).toFixed(1) + '%"></i>' +
+				'</span></td></tr>';
+		}).join('');
+		var more = '';
+		if (rows.length > DEST_COLLAPSE) {
+			more = '<button class="bwd-daily-more" type="button">' +
+				(state.destExpanded ? 'Show less' : 'Show all ' + rows.length + (d.more ? '+' : '') + ' destinations') + '</button>';
+		}
+		box.innerHTML = head +
+			(chips ? '<div class="bwd-dest-chips">' + chips + '</div>' : '') +
+			'<table class="bwd-daily-tbl"><thead><tr>' +
+				'<th>Destination</th><th>App</th><th class="bwd-daily-num">In</th><th class="bwd-daily-num">Out</th>' +
+				'<th class="bwd-daily-num">Total</th><th class="bwd-daily-barhead"></th></tr></thead><tbody>' +
+				body + '</tbody></table>' + more;
+		var mb = box.querySelector('.bwd-daily-more');
+		if (mb) { mb.addEventListener('click', function () { state.destExpanded = !state.destExpanded; renderDestinations(d); }); }
 	}
 	function gradient(ctx, area, hex) {
 		var g = ctx.createLinearGradient(0, area.top, 0, area.bottom);
@@ -1002,6 +1087,9 @@
 		return api({ action: 'status' }).then(function (s) {
 			var hadProbe = state.probeEnabled;
 			state.probeEnabled = !!s.probe;
+			var hadFlows = state.flowsEnabled;
+			state.flowsEnabled = !!s.flows;
+			state.flowsStatus = s.flows_status || null;
 			var b = el('#bwd-banner');
 			if (!s.enabled) {
 				b.hidden = false;
@@ -1016,6 +1104,7 @@
 			// 60 s tick a blind re-select rebuilt the override editor (discarding
 			// whatever was being typed) and re-collapsed the daily table every minute.
 			if (state.selected && hadProbe !== state.probeEnabled) { selectHost(state.selected); }
+			else if (state.selected && hadFlows !== state.flowsEnabled) { refreshSelected(); }
 		}).catch(function () {});
 	}
 

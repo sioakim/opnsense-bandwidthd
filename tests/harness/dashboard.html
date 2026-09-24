@@ -17,7 +17,7 @@
   // Map /api/bandwidthd/data/<action> onto a fixture file. An action with no
   // fixture is recorded and answered with {} — it shows up as an unmapped call
   // rather than a silent failure.
-  var FIXTURES = ['status', 'hosts', 'overview', 'series', 'percentile', 'daily', 'tags'];
+  var FIXTURES = ['status', 'hosts', 'overview', 'series', 'percentile', 'daily', 'tags', 'destinations'];
   window.fetch = function (url, opts) {
     window.__bwdCalls.push({ url: String(url), method: (opts && opts.method) || 'GET',
                              csrf: !!(opts && opts.headers && opts.headers['X-CSRFToken']) });
@@ -67,7 +67,7 @@
     window.bwdCsrfToken = "harness-token";
 </script>
 
-<link rel="stylesheet" href="../../plugin/src/www/bandwidthd_ui/css/bandwidthd.css?v=19"/>
+<link rel="stylesheet" href="../../plugin/src/www/bandwidthd_ui/css/bandwidthd.css?v=20"/>
 
 
 
@@ -76,7 +76,7 @@
     window.bwdCsrfToken = "harness-token";
 </script>
 
-<link rel="stylesheet" href="../../plugin/src/www/bandwidthd_ui/css/bandwidthd.css?v=19"/>
+<link rel="stylesheet" href="../../plugin/src/www/bandwidthd_ui/css/bandwidthd.css?v=20"/>
 
 <div id="bwd-app" class="bwd-app">
     <div id="bwd-banner" class="bwd-banner" role="status" hidden></div>
@@ -194,6 +194,7 @@
                 </div>
                 <div class="bwd-proto" id="bwd-proto"></div>
                 <div class="bwd-daily" id="bwd-daily" hidden></div>
+                <div class="bwd-daily bwd-dest" id="bwd-dest" hidden></div>
                 <div class="bwd-alertcfg" id="bwd-alertcfg" hidden></div>
             </div>
         </div>
@@ -201,7 +202,7 @@
 </div>
 
 <script src="../../plugin/src/www/bandwidthd_ui/vendor/chart.umd.min.js"></script>
-<script src="../../plugin/src/www/bandwidthd_ui/js/bandwidthd.js?v=19"></script>
+<script src="../../plugin/src/www/bandwidthd_ui/js/bandwidthd.js?v=20"></script>
 
 </div></div>
 <script>

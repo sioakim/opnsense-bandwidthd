@@ -236,4 +236,43 @@
         <help>Delete daily totals older than this. 0 keeps them forever.</help>
         <advanced>true</advanced>
     </field>
+    <field>
+        <id>bandwidthd.general.flows_enable</id>
+        <label>Destinations (ntopng)</label>
+        <type>checkbox</type>
+        <help>
+            Every minute, sample ntopng's live flows and record which hosts and applications each
+            device talks to, shown under each device on the dashboard. Requires the os-ntopng plugin,
+            running on the same interface. Sampled, not accounted: very short connections can be missed.
+        </help>
+    </field>
+    <field>
+        <id>bandwidthd.general.ntopng_url</id>
+        <label>ntopng URL</label>
+        <type>text</type>
+        <help>Base URL of ntopng's web server. The default suits ntopng on this firewall.</help>
+    </field>
+    <field>
+        <id>bandwidthd.general.ntopng_token</id>
+        <label>ntopng API token</label>
+        <type>password</type>
+        <help>
+            An API token for an ntopng user allowed to see all networks. An unprivileged user is
+            enough; generate the token under that user's settings in ntopng.
+        </help>
+    </field>
+    <field>
+        <id>bandwidthd.general.flows_topn</id>
+        <label>Destinations kept per device</label>
+        <type>text</type>
+        <help>Per device and per hour/day; smaller destinations are summed into "(other)".</help>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>bandwidthd.general.flows_retention_days</id>
+        <label>Destination history (days)</label>
+        <type>text</type>
+        <help>Hourly detail is kept for 8 days, then daily totals for this long.</help>
+        <advanced>true</advanced>
+    </field>
 </form>

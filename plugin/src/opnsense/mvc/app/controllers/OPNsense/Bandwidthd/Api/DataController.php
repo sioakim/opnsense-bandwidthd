@@ -81,6 +81,16 @@ class DataController extends ApiControllerBase
         return bwd_overview($w['period'], $w['from'], $w['to'], $topn, $w['tags']);
     }
 
+    /* Destinations and applications for a device (MAC, IP, or 0.0.0.0 for all). */
+    public function destinationsAction()
+    {
+        $this->lib();
+        $w = $this->window();
+        $limit = max(1, min(500, (int)$this->request->get('limit', null, 100)));
+        return bwd_destinations((string)$this->request->get('ip', null, ''), $w['period'], $w['from'], $w['to'],
+            $w['tags'], $limit);
+    }
+
     /* All custom tags in use -> [tag => count]; drives the tag editor. */
     public function tagsAction()
     {
@@ -97,6 +107,8 @@ class DataController extends ApiControllerBase
             'have_data' => count(bwd_cdf_files(1)) > 0,
             'probe' => bwd_cfg_on('probe_enable'),
             'db' => bwd_db_enabled(),
+            'flows' => bwd_cfg_on('flows_enable'),
+            'flows_status' => bwd_flows_status(),
         ];
     }
 

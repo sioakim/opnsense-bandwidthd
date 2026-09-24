@@ -175,6 +175,33 @@
                 <MinimumValue>0</MinimumValue>
                 <MaximumValue>3650</MaximumValue>
             </db_daily_retention_days>
+
+            <!-- Destinations and applications per device, sampled from ntopng's
+                 live flows (lib/bwd_flows.inc.php). Needs os-ntopng. -->
+            <flows_enable type="BooleanField">
+                <default>0</default>
+            </flows_enable>
+            <ntopng_url type="TextField">
+                <default>http://127.0.0.1:3000</default>
+                <Required>N</Required>
+                <mask>/^https?:\/\/[a-zA-Z0-9.:\[\]_-]{1,253}(:[0-9]{1,5})?\/?$/</mask>
+                <ValidationMessage>An http(s) base URL, e.g. http://127.0.0.1:3000.</ValidationMessage>
+            </ntopng_url>
+            <ntopng_token type="TextField">
+                <Required>N</Required>
+                <mask>/^([a-zA-Z0-9]){0,128}$/</mask>
+                <ValidationMessage>An ntopng API token (letters and digits).</ValidationMessage>
+            </ntopng_token>
+            <flows_topn type="IntegerField">
+                <default>100</default>
+                <MinimumValue>10</MinimumValue>
+                <MaximumValue>1000</MaximumValue>
+            </flows_topn>
+            <flows_retention_days type="IntegerField">
+                <default>31</default>
+                <MinimumValue>9</MinimumValue>
+                <MaximumValue>366</MaximumValue>
+            </flows_retention_days>
         </general>
 
         <!-- Per-device overrides. An ArrayField has no column cap and never

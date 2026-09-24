@@ -54,7 +54,7 @@ function bwd_bool_keys() {
 	return array(
 		'enabled', 'promiscuous', 'drawgraphs', 'outputcdf', 'recovercdf',
 		'alerts_enable', 'anomaly_enable', 'exfil_enable', 'newdevice_enable',
-		'probe_enable', 'report_enable', 'db_enable',
+		'probe_enable', 'report_enable', 'db_enable', 'flows_enable',
 	);
 }
 

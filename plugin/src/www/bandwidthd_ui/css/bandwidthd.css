@@ -592,6 +592,20 @@
 .bwd-daily-more:hover { background: var(--bwd-inset); }
 .bwd-daily-sub { font-size: 11px; color: var(--bwd-muted); }
 
+/* Destinations: the day-ledger table, plus app chips and a status line. */
+.bwd-dest-name { word-break: break-all; }
+.bwd-dest-app { color: var(--bwd-muted); white-space: nowrap; }
+.bwd-dest-other td { font-style: italic; color: var(--bwd-muted); }
+.bwd-dest-note { padding: 6px 12px; font-size: 11px; color: var(--bwd-muted); }
+.bwd-dest-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--bwd-line-soft); }
+.bwd-dest-chip {
+	font-size: 11px;
+	padding: 2px 8px;
+	border-radius: 10px;
+	background: var(--bwd-inset);
+	border: 1px solid var(--bwd-line-soft);
+}
+
 /* ------------------------------------------------- 8. editors (override) */
 
 .bwd-alertcfg, .bwd-tageditor { border-top: 1px solid var(--bwd-line-soft); }

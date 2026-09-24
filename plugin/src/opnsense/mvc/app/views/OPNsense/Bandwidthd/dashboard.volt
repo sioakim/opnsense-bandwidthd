@@ -15,7 +15,7 @@
     window.bwdCsrfToken = "{{ csrf_token }}";
 </script>
 
-<link rel="stylesheet" href="/bandwidthd_ui/css/bandwidthd.css?v=19"/>
+<link rel="stylesheet" href="/bandwidthd_ui/css/bandwidthd.css?v=20"/>
 
 <div id="bwd-app" class="bwd-app">
     <div id="bwd-banner" class="bwd-banner" role="status" hidden></div>
@@ -133,6 +133,7 @@
                 </div>
                 <div class="bwd-proto" id="bwd-proto"></div>
                 <div class="bwd-daily" id="bwd-daily" hidden></div>
+                <div class="bwd-daily bwd-dest" id="bwd-dest" hidden></div>
                 <div class="bwd-alertcfg" id="bwd-alertcfg" hidden></div>
             </div>
         </div>
@@ -140,4 +141,4 @@
 </div>
 
 <script src="/bandwidthd_ui/vendor/chart.umd.min.js"></script>
-<script src="/bandwidthd_ui/js/bandwidthd.js?v=19"></script>
+<script src="/bandwidthd_ui/js/bandwidthd.js?v=20"></script>

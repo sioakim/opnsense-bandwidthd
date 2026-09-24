@@ -19,6 +19,7 @@
             <pattern>api/bandwidthd/data/series*</pattern>
             <pattern>api/bandwidthd/data/percentile*</pattern>
             <pattern>api/bandwidthd/data/daily*</pattern>
+            <pattern>api/bandwidthd/data/destinations*</pattern>
             <pattern>api/bandwidthd/data/overview*</pattern>
             <pattern>api/bandwidthd/data/tags*</pattern>
             <pattern>api/bandwidthd/data/status*</pattern>

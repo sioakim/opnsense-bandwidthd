@@ -532,6 +532,8 @@ if (is_file(__DIR__ . '/bwd_db.inc.php')) { require_once(__DIR__ . '/bwd_db.inc.
 /* Device fingerprint engine (#11): HTTP/mDNS/SSDP/nmap/DHCP/banner. Feeds
  * bwd_classify a high-weight `fingerprint` signal from its cache when present. */
 if (is_file(__DIR__ . '/bwd_fingerprint.inc.php')) { require_once(__DIR__ . '/bwd_fingerprint.inc.php'); }
+/* Per-device destinations and applications, collected from ntopng. */
+if (is_file(__DIR__ . '/bwd_flows.inc.php')) { require_once(__DIR__ . '/bwd_flows.inc.php'); }
 
 /* Hybrid engages only with a reachable DB that has data. $GLOBALS['bwd_no_db']
  * forces CDF-only (used by parity tests). */

@@ -101,6 +101,22 @@ rotated file first so the current one takes precedence.
 silently dropped — the failure is indistinguishable from a schedule that simply
 never fires. `tests/check_plugin.php` guards this.
 
+### Saving settings does not rewrite the crontab
+
+Jobs are derived from the settings by `bandwidthd_cron()`, but the stock
+`reconfigure` path renders templates and restarts the service — it never calls
+`system_cron_configure()`. Until 1.1.0 only install and uninstall did, so a
+feature switched on in the GUI silently had no job (and one switched off kept
+running) until the next package install. `ServiceController::reconfigureAction()`
+now runs the `bandwidthd cron` configd action after the stock work.
+
+### PHP cannot open URLs
+
+OPNsense's PHP runs with `allow_url_fopen` off, so `file_get_contents('http://…')`
+fails with "no suitable wrapper could be found" — reported, behind `@`, as a
+plain `false`. Use the curl extension (`php-curl` is a dependency of the core
+`opnsense` package) or a raw `stream_socket_client()`.
+
 ### Booleans must be listed, not detected
 
 The model stores a `BooleanField` as `"1"`/`"0"`. Translating those to

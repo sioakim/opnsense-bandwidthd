@@ -124,6 +124,13 @@ function bandwidthd_cron()
         $jobs[]['autocron'] = ['/usr/local/sbin/configctl -d bandwidthd dbmaint', '20', '3'];
     }
 
+    if (bandwidthd_setting('flows_enable') === '1') {
+        /* Every minute: the collector turns ntopng's cumulative per-flow counters
+           into deltas, so the poll interval bounds how much of a short or ending
+           flow is missed. It holds its own lock, so -d is safe here. */
+        $jobs[]['autocron'] = ['/usr/local/sbin/configctl -d bandwidthd flows', '*'];
+    }
+
     if (bandwidthd_setting('probe_enable') === '1') {
         /* Incremental: only devices whose fingerprint is missing or stale. */
         $jobs[]['autocron'] = [

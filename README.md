@@ -93,6 +93,19 @@ created.
 - free-form tags, per-device name/vendor/quota overrides edited in place, and
   CSV/JSON export of the current view
 
+**Destinations** (optional, needs [os-ntopng](https://docs.opnsense.org/manual/ntopng.html))
+— which hosts and applications each device talks to, shown under the device on
+the dashboard (or for the whole LAN under Interface Total). Every minute a job
+reads ntopng's live flows through its REST API, takes the growth of each flow's
+byte counters since the last poll, and files it by device (MAC), destination
+(TLS SNI / HTTP Host / DNS name from nDPI, else the address) and application.
+Hourly detail is kept for 8 days, daily totals for a configurable period.
+The figures are **sampled**: a connection that opens and closes between two
+polls is never seen, so they run below the traffic totals above them — the
+totals remain the accounting source. Only hostnames are visible, never URL
+paths: HTTPS hides them, and nothing here intercepts TLS. Enable it under
+Services → BandwidthD with an API token for an unprivileged ntopng user.
+
 **Alerting** — daily quota (interface and per-device), anomaly detection against
 a device's own 7-day average, an exfiltration heuristic, and new-device alerts.
 Backed by a durable daily rollup that survives CDF log rotation.
