@@ -212,7 +212,8 @@ MACs, and rotating private MACs (iOS/Android) present a new identity per rotatio
 - `php tests/run.php` — data-layer units (CDF parsing and the protocol invariant,
   MAC consolidation, tags, percentile/CIDR maths, OUI/vendor, a classifier accuracy
   floor, CSV escaping). Runs off-box via the stubs in `tests/bootstrap.php`, which
-  replace the platform seam.
+  replace the platform seam. It also runs `tests/github_remote.sh`, the shell test
+  for `publish-repo.sh`'s GitHub-remote detection, so it needs `git` on the PATH.
 - `php tests/check_plugin.php` — structural contracts: model/form field agreement,
   the boolean list, JS-to-controller endpoint agreement, configd action coverage,
   no duplicate function definitions, no server-side data in the web root, and the
