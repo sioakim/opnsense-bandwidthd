@@ -77,8 +77,8 @@ sh scripts/publish-repo.sh root@fw
 ```
 
 `publish-repo.sh` copies `dist/repo` off the box, checks out `gh-pages` in a
-temporary worktree, replaces its contents, commits and pushes to the `github`
-remote, and verifies the pushed ref. GitHub Pages picks the change up within a
+temporary worktree, replaces its contents, commits and pushes to the GitHub
+remote (`github` if it exists, else the remote whose URL is on github.com), and verifies the pushed ref. GitHub Pages picks the change up within a
 few minutes.
 
 First-time setup: the GitHub repository needs Pages enabled with source

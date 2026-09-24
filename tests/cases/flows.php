@@ -18,6 +18,8 @@ t_eq('198.51.100.1', bwd_flows_dest_label('Desktop Sharing', '198.51.100.1', '19
 	'free-text info (a Teams STUN label) is not a destination');
 t_eq('cdn.example.net', bwd_flows_dest_label('', 'cdn.example.net', '198.51.100.1'), 'falls back to the resolved server name');
 t_eq('198.51.100.1', bwd_flows_dest_label('', '198.51.100.1', '198.51.100.1'), 'an IP-shaped name is not a hostname');
+// A malformed row must not be able to name itself after the (other) remainder row.
+t_eq('unknown', bwd_flows_dest_label('', '', BWD_FLOWS_OTHER), 'a non-address fallback becomes unknown, never (other)');
 
 /* ---- ingest ---- */
 $f1 = $flow('192.0.2.10', '198.51.100.1', 100, 5000, 'video.example.com', 'TLS.Video');

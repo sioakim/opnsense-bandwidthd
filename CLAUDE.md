@@ -56,8 +56,9 @@ touching it:
   that doesn't match it, and `check_plugin.php` asserts it is the sha256 of
   `repo/bandwidthd.pub`. Never regenerate it casually.
 - The flow is `scripts/build-repo.sh` on the box, then `scripts/publish-repo.sh`
-  here. `origin` is a private remote; `github` is the public mirror and the Pages
-  host. Both get `main`.
+  here. It pushes `gh-pages` to the `github` remote if one exists, else to the
+  remote whose URL is on github.com (in the canonical clone, `origin`). That
+  remote carries `main` too.
 
 ## The platform seam
 

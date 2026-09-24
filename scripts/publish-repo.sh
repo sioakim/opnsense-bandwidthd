@@ -8,18 +8,27 @@
 #
 # Runs on the workstation. Environment: REMOTE_DIR (checkout on the box,
 # default /root/opnsense-bandwidthd), GH_REMOTE (git remote for GitHub,
-# default github), SCP (copy command, default scp).
+# default: `github` if it exists, else the first remote whose URL is on
+# github.com), SCP (copy command, default scp).
 #
 set -eu
 
 HOST="${1:?usage: sh scripts/publish-repo.sh user@host}"
 REMOTE_DIR="${REMOTE_DIR:-/root/opnsense-bandwidthd}"
 SCP="${SCP:-scp}"               # e.g. SCP="sshpass -e scp" for a password-auth box
-GH_REMOTE="${GH_REMOTE:-github}"
+GH_REMOTE="${GH_REMOTE:-}"
 PAGES_BRANCH=gh-pages
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# The GitHub remote: `github` if there is one, else the remote on github.com.
+if [ -z "${GH_REMOTE}" ]; then
+	GH_REMOTE=github
+	if ! git -C "${REPO_ROOT}" remote get-url github >/dev/null 2>&1; then
+		GH_REMOTE="$(git -C "${REPO_ROOT}" remote -v | awk '$2 ~ /github\.com[:\/]/ { print $1; exit }')"
+		[ -n "${GH_REMOTE}" ] || GH_REMOTE=github
+	fi
+fi
 WORK="$(mktemp -d)"
 SITE="${WORK}/site"
 cleanup() {

@@ -26,16 +26,16 @@ class ServiceController extends ApiMutableServiceControllerBase
      * rewrites the crontab, so a feature switched on or off kept its old schedule
      * until the next package install.
      */
-	public function reconfigureAction()
-	{
-		$result = parent::reconfigureAction();
-		if ($this->request->isPost() && ($result['status'] ?? '') === 'ok') {
-			$cron = trim((string) (new Backend())->configdRun('bandwidthd cron'));
-			if ($cron !== 'OK') {
-				$result['status'] = 'failed';
-				$result['message'] = 'Cron regeneration failed: ' . $cron;
-			}
-		}
-		return $result;
-	}
+    public function reconfigureAction()
+    {
+        $result = parent::reconfigureAction();
+        if ($this->request->isPost() && ($result['status'] ?? '') === 'ok') {
+            $cron = trim((string) (new Backend())->configdRun('bandwidthd cron'));
+            if ($cron !== 'OK') {
+                $result['status'] = 'failed';
+                $result['message'] = 'Cron regeneration failed: ' . $cron;
+            }
+        }
+        return $result;
+    }
 }

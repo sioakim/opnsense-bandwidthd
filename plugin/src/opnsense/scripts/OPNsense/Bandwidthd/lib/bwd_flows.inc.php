@@ -41,7 +41,8 @@ if (!defined('BWD_FLOWS_OTHER')) { define('BWD_FLOWS_OTHER', '(other)'); }
 /* What to call a flow's far end. ntopng's `info` carries the SNI / Host / DNS
  * name, but for some protocols it is free text ("Desktop Sharing" on a Teams
  * STUN flow), so only a hostname-shaped value is used. Then ntopng's own name
- * for the server if it resolved one, then the bare address. */
+ * for the server if it resolved one, then the bare address — or 'unknown' for
+ * a malformed row, so no label can collide with BWD_FLOWS_OTHER. */
 function bwd_flows_dest_label($info, $remoteName, $remoteIp) {
 	foreach (array($info, $remoteName) as $v) {
 		$v = strtolower(trim((string) $v));
@@ -51,7 +52,7 @@ function bwd_flows_dest_label($info, $remoteName, $remoteIp) {
 			return rtrim($v, '.');
 		}
 	}
-	return (string) $remoteIp;
+	return filter_var((string) $remoteIp, FILTER_VALIDATE_IP) ? (string) $remoteIp : 'unknown';
 }
 
 /**
@@ -402,5 +403,5 @@ function bwd_ntopng_flows($base, $token) {
  * the status endpoint reads it on every page load. */
 function bwd_flows_status($dir = BWD_FLOWS_DIR) {
 	$j = is_file("$dir/status.json") ? json_decode((string) @file_get_contents("$dir/status.json"), true) : null;
-	return is_array($j) ? $j : array('ok' => false, 'at' => 0, 'error' => '', 'flows' => 0);
+	return is_array($j) ? $j : array('ok' => false, 'at' => 0, 'error' => '', 'fetched' => 0);
 }

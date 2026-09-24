@@ -41,10 +41,12 @@ $token = (string) bwd_cfg('ntopng_token', '');
 $topn = (int) bwd_cfg('flows_topn', 100) ?: 100;
 $retention = (int) bwd_cfg('flows_retention_days', 31) ?: 31;
 
+/* 'fetched' is the number of live flows ntopng returned, not the number that
+ * contributed bytes (baseline polls, local-only and duplicate rows count nothing). */
 $status = function ($ok, $error, $count) use ($dry, $now) {
 	if ($dry) { return; }
 	bwd_atomic_write(BWD_FLOWS_DIR . '/status.json',
-		bwd_json(array('ok' => $ok, 'at' => $now, 'error' => $error, 'flows' => $count)));
+		bwd_json(array('ok' => $ok, 'at' => $now, 'error' => $error, 'fetched' => $count)));
 };
 
 /* Housekeeping must still run during an ntopng outage. */
