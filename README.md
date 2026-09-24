@@ -101,8 +101,11 @@ byte counters since the last poll, and files it by device (MAC), destination
 (TLS SNI / HTTP Host / DNS name from nDPI, else the address) and application.
 Hourly detail is kept for 8 days, daily totals for a configurable period.
 The figures are **sampled**: a connection that opens and closes between two
-polls is never seen, so they run below the traffic totals above them — the
-totals remain the accounting source. Only hostnames are visible, never URL
+polls is never seen. ntopng also counts whole Ethernet frames where bandwidthd
+counts IP packets, so small-packet traffic (uploads, ACKs) reads noticeably
+higher. On a live network one full hour came out at 108% of bandwidthd's figure
+inbound and 117% outbound, so the destination totals can be above or below the
+traffic totals. Those remain the accounting source. Only hostnames are visible, never URL
 paths: HTTPS hides them, and nothing here intercepts TLS. Enable it under
 Services → BandwidthD with an API token for an unprivileged ntopng user.
 

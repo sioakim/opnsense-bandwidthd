@@ -593,7 +593,11 @@
 .bwd-daily-sub { font-size: 11px; color: var(--bwd-muted); }
 
 /* Destinations: the day-ledger table, plus app chips and a status line. */
-.bwd-dest-name { word-break: break-all; }
+/* The JS puts a <wbr> after every dot, so names wrap between labels; anywhere is
+ * only the fallback for a single label wider than the column. */
+.bwd-dest-name { overflow-wrap: anywhere; }
+/* The destination name needs the room more than the bar does. */
+.bwd-dest .bwd-daily-barcell { width: 20%; }
 .bwd-dest-app { color: var(--bwd-muted); white-space: nowrap; }
 .bwd-dest-other td { font-style: italic; color: var(--bwd-muted); }
 .bwd-dest-note { padding: 6px 12px; font-size: 11px; color: var(--bwd-muted); }
@@ -707,4 +711,6 @@
 	.bwd-tag-chip { padding: 7px 8px; }
 	.bwd-daily-barcell,
 	.bwd-daily-barhead { display: none; }   /* header and cells together, or the row widths disagree */
+	/* The app is in the chips above; on a phone the name needs the width. */
+	.bwd-dest-app { display: none; }
 }

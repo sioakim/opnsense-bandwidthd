@@ -783,7 +783,8 @@
 		if (st) { notes.push(escapeHtml(st)); }
 		if (d && d.since && d.from < d.since) { notes.push('history available from ' + escapeHtml(fmtFull(d.since))); }
 		var head = '<div class="bwd-daily-head"><span class="bwd-daily-title" title="Sampled every minute from ntopng\'s live flows; ' +
-				'very short connections can be missed, so totals run below the traffic figures above.">Destinations</span>' +
+				'ntopng counts whole Ethernet frames and misses very short connections, so these totals can read above or below ' +
+				'the traffic figures above — well above for upload- and ACK-heavy traffic.">Destinations</span>' +
 			'<span class="bwd-daily-sub">' + (rows.length ?
 				'<span class="bwd-in"><i>▼</i> ' + fmtBytes(d.total_in) + '</span> · <span class="bwd-out"><i>▲</i> ' +
 				fmtBytes(d.total_out) + '</span> · sampled' : 'sampled') + '</span></div>' +
@@ -802,7 +803,9 @@
 			var w = Math.min(100, r.total / max * 100);
 			var inW = r.total ? (r.in / r.total * 100) : 0;
 			return '<tr' + (r.other ? ' class="bwd-dest-other"' : '') + '>' +
-				'<td class="bwd-dest-name">' + escapeHtml(r.name) + '</td>' +
+				// Break long hostnames at their dots rather than mid-label. escapeHtml()
+				// never emits a dot, so this cannot split an entity.
+				'<td class="bwd-dest-name">' + escapeHtml(r.name).replace(/\./g, '.<wbr>') + '</td>' +
 				'<td class="bwd-dest-app">' + escapeHtml(r.app || '') + '</td>' +
 				'<td class="bwd-daily-num bwd-in">' + fmtBytes(r.in) + '</td>' +
 				'<td class="bwd-daily-num bwd-out">' + fmtBytes(r.out) + '</td>' +
@@ -820,7 +823,7 @@
 		box.innerHTML = head +
 			(chips ? '<div class="bwd-dest-chips">' + chips + '</div>' : '') +
 			'<table class="bwd-daily-tbl"><thead><tr>' +
-				'<th>Destination</th><th>App</th><th class="bwd-daily-num">In</th><th class="bwd-daily-num">Out</th>' +
+				'<th>Destination</th><th class="bwd-dest-app">App</th><th class="bwd-daily-num">In</th><th class="bwd-daily-num">Out</th>' +
 				'<th class="bwd-daily-num">Total</th><th class="bwd-daily-barhead"></th></tr></thead><tbody>' +
 				body + '</tbody></table>' + more;
 		var mb = box.querySelector('.bwd-daily-more');
