@@ -782,9 +782,8 @@
 		var st = destStatusNote();
 		if (st) { notes.push(escapeHtml(st)); }
 		if (d && d.since && d.from < d.since) { notes.push('history available from ' + escapeHtml(fmtFull(d.since))); }
-		var head = '<div class="bwd-daily-head"><span class="bwd-daily-title" title="Sampled every minute from ntopng\'s live flows; ' +
-				'ntopng counts whole Ethernet frames and misses very short connections, so these totals can read above or below ' +
-				'the traffic figures above — well above for upload- and ACK-heavy traffic.">Destinations</span>' +
+		var head = '<div class="bwd-daily-head"><span class="bwd-daily-title" title="Once-a-minute polling of ntopng\'s live flows misses short connections between polls. ' +
+				'Sampled totals may be above or below the traffic totals, which remain the accounting source.">Destinations</span>' +
 			'<span class="bwd-daily-sub">' + (rows.length ?
 				'<span class="bwd-in"><i>▼</i> ' + fmtBytes(d.total_in) + '</span> · <span class="bwd-out"><i>▲</i> ' +
 				fmtBytes(d.total_out) + '</span> · sampled' : 'sampled') + '</span></div>' +
@@ -804,7 +803,7 @@
 			var inW = r.total ? (r.in / r.total * 100) : 0;
 			return '<tr' + (r.other ? ' class="bwd-dest-other"' : '') + '>' +
 				// Break long hostnames at their dots rather than mid-label. escapeHtml()
-				// never emits a dot, so this cannot split an entity.
+				// preserves dots; none of the entities it emits contains a dot, so this cannot split one.
 				'<td class="bwd-dest-name">' + escapeHtml(r.name).replace(/\./g, '.<wbr>') + '</td>' +
 				'<td class="bwd-dest-app">' + escapeHtml(r.app || '') + '</td>' +
 				'<td class="bwd-daily-num bwd-in">' + fmtBytes(r.in) + '</td>' +

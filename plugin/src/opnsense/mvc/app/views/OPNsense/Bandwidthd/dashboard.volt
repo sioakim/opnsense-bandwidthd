@@ -141,4 +141,4 @@
 </div>
 
 <script src="/bandwidthd_ui/vendor/chart.umd.min.js"></script>
-<script src="/bandwidthd_ui/js/bandwidthd.js?v=22"></script>
+<script src="/bandwidthd_ui/js/bandwidthd.js?v=23"></script>
