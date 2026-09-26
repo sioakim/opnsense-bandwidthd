@@ -68,6 +68,10 @@ mkdir -p "${SITE}/fingerprints/trusted"
 cp "${REPO_ROOT}/repo/fingerprints/trusted/bandwidthd" "${SITE}/fingerprints/trusted/"
 : > "${SITE}/.nojekyll"   # serve every file as-is, including dot-files and ${ABI} paths
 
+# Keep the trusted Pages workflow in every regenerated publication branch.
+mkdir -p "${SITE}/.github/workflows"
+cp "${REPO_ROOT}/.github/workflows/pages.yml" "${SITE}/.github/workflows/pages.yml"
+
 # 4. Commit and push.
 git -C "${SITE}" add -A
 if git -C "${SITE}" diff --cached --quiet; then
