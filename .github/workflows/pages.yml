@@ -1,0 +1,40 @@
+name: Publish existing Pages site
+on:
+  push:
+    branches: [gh-pages]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    # The environment admits gh-pages only; manual dispatch must select it too.
+    if: github.ref == 'refs/heads/gh-pages'
+    runs-on: [self-hosted, Linux, X64, private-ubuntu]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Stage existing static files without repository metadata
+        shell: bash
+        run: |
+          test -f .nojekyll
+          rm -rf "${RUNNER_TEMP:?}/pages-site"
+          mkdir -p "$RUNNER_TEMP/pages-site"
+          git archive HEAD -- . ':!.github' | tar -x -C "$RUNNER_TEMP/pages-site"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/pages-site
+      - name: Deploy unchanged site
+        id: deployment
+        uses: actions/deploy-pages@v4

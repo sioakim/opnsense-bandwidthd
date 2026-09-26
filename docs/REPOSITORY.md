@@ -81,8 +81,16 @@ temporary worktree, replaces its contents, commits and pushes to the GitHub
 remote (`github` if it exists, else the remote whose URL is on github.com), and verifies the pushed ref. GitHub Pages picks the change up within a
 few minutes.
 
-First-time setup: the GitHub repository needs Pages enabled with source
-`gh-pages` / root. Everything else is created by the script.
+Pages uses the custom Actions workflow `.github/workflows/pages.yml` on the
+private Ubuntu runner. It uploads the existing static files without rebuilding
+packages or running Jekyll; `.git` and `.github` are excluded from the artifact.
+`publish-repo.sh` copies the workflow into every regenerated `gh-pages` tree so
+its push triggers publication. The default branch retains the same workflow for
+manual discovery; to republish, dispatch it with **branch `gh-pages`**. The
+`github-pages` environment permits that branch only. There are no PR triggers.
+
+First-time setup: enable Pages with build type **GitHub Actions**, and restrict
+the `github-pages` environment to `gh-pages`.
 
 ## Client-side notes
 
