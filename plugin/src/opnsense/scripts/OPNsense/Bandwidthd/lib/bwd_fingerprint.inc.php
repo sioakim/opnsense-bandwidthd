@@ -459,12 +459,22 @@ function bwd_fp_identify_device($ip, $opts = array()) {
  * hostile or merely broken device can neither corrupt the cache (json_encode of
  * invalid UTF-8 is false) nor inflate it with a 64 KB "model". */
 function bwd_fp_clean($s, $cap = 200) {
-	if (!is_string($s)) { return $s; }
-	$s = @iconv('UTF-8', 'UTF-8//IGNORE', $s);
-	if ($s === false) { $s = ''; }
-	$s = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $s);
-	if (strlen($s) > $cap) { $s = substr($s, 0, $cap); $s = @iconv('UTF-8', 'UTF-8//IGNORE', $s) ?: ''; }
-	return $s;
+    if (!is_string($s)) { return $s; }
+
+    $previous = mb_substitute_character();
+    mb_substitute_character('none');
+    try {
+        $s = mb_convert_encoding($s, 'UTF-8', 'UTF-8');
+    } finally {
+        mb_substitute_character($previous);
+    }
+
+    if ($s === false) { $s = ''; }
+    $s = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $s);
+    if (strlen($s) > $cap) {
+        $s = mb_strcut($s, 0, $cap, 'UTF-8');
+    }
+    return $s;
 }
 function bwd_fp_clean_deep($v, $cap = 200) {
 	if (is_array($v)) {
