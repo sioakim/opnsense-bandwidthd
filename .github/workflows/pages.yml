@@ -12,7 +12,7 @@ jobs:
   deploy:
     # The environment admits gh-pages only; manual dispatch must select it too.
     if: github.ref == 'refs/heads/gh-pages'
-    runs-on: [self-hosted, Linux, X64, private-ubuntu]
+    runs-on: [self-hosted, Linux, ARM64, private-ubuntu]
     timeout-minutes: 10
     permissions:
       contents: read
